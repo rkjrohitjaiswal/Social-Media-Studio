@@ -124,6 +124,67 @@ export class ThreadsAnalyticsAdapter implements SocialPlatformAnalyticsProvider 
   }
 }
 
+export class PinterestAnalyticsAdapter implements SocialPlatformAnalyticsProvider {
+  readonly platform = "PINTEREST" as const;
+
+  async getMediaAnalytics(externalPostId: string, accessToken?: string): Promise<AnalyticsResponse> {
+    if (!accessToken || accessToken.startsWith("mock-")) {
+      return {
+        available: false,
+        message:
+          "Pinterest analytics requires 'pins:read' scope approval from the Pinterest Developer Console.",
+      };
+    }
+
+    try {
+      const today = new Date().toISOString().split("T")[0];
+      const monthAgo = new Date(Date.now() - 30 * 86400 * 1000).toISOString().split("T")[0];
+      const url = `https://api.pinterest.com/v5/pins/${externalPostId}/analytics?start_date=${monthAgo}&end_date=${today}&metric_types=IMPRESSION,PIN_CLICK,OUTBOUND_CLICK,SAVE`;
+
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+        cache: "no-store",
+      });
+
+      if (!res.ok) {
+        return {
+          available: false,
+          message:
+            "Pinterest analytics requires 'pins:read' scope approval from the Pinterest Developer Console.",
+        };
+      }
+
+      const payload = (await res.json()) as { all?: { summary_metrics?: Record<string, number> } };
+      const metrics = payload.all?.summary_metrics || {};
+
+      const impressions = metrics.IMPRESSION || 0;
+      const clicks = (metrics.PIN_CLICK || 0) + (metrics.OUTBOUND_CLICK || 0);
+      const saves = metrics.SAVE || 0;
+      const totalEngagements = clicks + saves;
+
+      return {
+        available: true,
+        metrics: {
+          impressions,
+          reach: impressions,
+          likes: 0,
+          comments: 0,
+          shares: clicks,
+          saves,
+          engagements: totalEngagements,
+          engagementRate: impressions > 0 ? (totalEngagements / impressions) * 100 : 0,
+        },
+      };
+    } catch {
+      return {
+        available: false,
+        message:
+          "Pinterest analytics requires 'pins:read' scope approval from the Pinterest Developer Console.",
+      };
+    }
+  }
+}
+
 export class GenericUnsupportedAnalyticsProvider implements SocialPlatformAnalyticsProvider {
   readonly platform: SocialPlatform;
 
@@ -146,6 +207,7 @@ export class UniversalAnalyticsProvider {
     this.providers.set("INSTAGRAM", new InstagramAnalyticsAdapter());
     this.providers.set("LINKEDIN", new LinkedInAnalyticsAdapter());
     this.providers.set("THREADS", new ThreadsAnalyticsAdapter());
+    this.providers.set("PINTEREST", new PinterestAnalyticsAdapter());
   }
 
   getProvider(platform: SocialPlatform): SocialPlatformAnalyticsProvider {

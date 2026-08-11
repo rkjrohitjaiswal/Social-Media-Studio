@@ -12,8 +12,8 @@ AI Social Media Studio is an enterprise-grade social content engine built with *
 | :--- | :--- | :--- | :--- | :--- |
 | **Instagram** | **LIVE** | OAuth 2.0 (Meta Graph API) | Live Graph API | Live Insights API |
 | **LinkedIn** | **LIVE** | OAuth 2.0 (LinkedIn REST API) | Live Posts & Image Upload API | Permission Guarded |
-| **Threads** | **MOCK/STUB** | Stub Account Service | Mock Engine | Stub |
-| **Pinterest** | **MOCK/STUB** | Stub Account Service | Mock Engine | Stub |
+| **Threads** | **LIVE** | OAuth 2.0 (Meta Threads API) | Live 2-Step Container API | Live Insights API |
+| **Pinterest** | **LIVE** | OAuth 2.0 (Pinterest API v5) | Live Image Pin & Board API | Permission Guarded |
 | **Facebook** | **MOCK/STUB** | Stub Account Service | Mock Engine | Stub |
 | **TikTok** | **MOCK/STUB** | Stub Account Service | Mock Engine | Stub |
 | **YouTube** | **MOCK/STUB** | Stub Account Service | Mock Engine | Stub |
@@ -38,49 +38,52 @@ AI Social Media Studio is an enterprise-grade social content engine built with *
 7. **Human Governance & Approval Inbox**: Multi-stage approval workflow (`PENDING`, `APPROVED`, `CHANGES_REQUESTED`, `REJECTED`) with approval isolation.
 8. **Instagram Production Integration**: Meta Graph API OAuth connection with AES-256-GCM encrypted token storage.
 9. **LinkedIn Production Integration**:
-   - **OAuth 2.0 Authorization Flow**: Endpoints at `/api/integrations/linkedin/connect`, `/api/integrations/linkedin/callback`, `/api/integrations/linkedin/disconnect` with HMAC signed state CSRF protection.
-   - **User Info Identity Resolution**: OpenID Connect identity retrieval (`https://api.linkedin.com/v2/userinfo`).
-   - **Token Encryption & Automatic Refresh**: AES-256-GCM encrypted access and refresh token storage. Automatic token expiration detection and refresh exchange at `https://www.linkedin.com/oauth/v2/accessToken`. Automatic fallback to `REAUTH_REQUIRED` status when refresh tokens are revoked or expired.
-   - **LinkedIn Posts API (REST API v202604)**: Direct text, image (`/rest/images?action=initializeUpload`), and article link publishing.
-   - **Member & Organization Posting Guards**: Support for person (`urn:li:person:...`) and organization (`urn:li:organization:...`) posting with permission checks (`w_organization_social`).
-10. **Content Calendar & Automated Scheduler**: Universal background publishing dispatching through provider registry with idempotency, grace periods, and retry queues.
-11. **Content Archetypes**: **Affiliate Product** (strict claim guardrails + mandatory `#ad` disclosure), **Certification** (skills learned, issuing organization, credential links), **Teaching / Masterclass**, **Project / Portfolio**, **Personal Brand**, **Announcement**, and **General Post**.
+   - OAuth 2.0 Authorization Code flow (`/api/integrations/linkedin/...`).
+   - OpenID identity resolution (`https://api.linkedin.com/v2/userinfo`).
+   - Live REST API v202604 post & image publishing with URN formatting and token refresh.
+10. **Threads Production Integration**:
+    - Meta Threads OAuth flow (`/api/integrations/threads/...`).
+    - 2-Step container publishing (`POST /v1.0/{user_id}/threads` & `POST /v1.0/{user_id}/threads_publish`) with status polling.
+    - Live insights analytics adapter (`GET /v1.0/{post_id}/threads_insights`).
+11. **Pinterest Production Integration**:
+    - **Pinterest API v5 OAuth 2.0**: Endpoints at `/api/integrations/pinterest/connect`, `/api/integrations/pinterest/callback`, `/api/integrations/pinterest/disconnect` using Basic Auth header token exchange.
+    - **Board Management & Selection**: Board discovery endpoint at `/api/integrations/pinterest/boards` (`GET /v5/boards`). Automatic default board fallback and custom board assignment via `platformMetadataJson.boardId`.
+    - **Image Pin Publishing**: Direct Pin creation (`POST /v5/pins`) with destination URLs (`link`), searchable titles (max 100 chars), rich descriptions (max 800 chars), and alt text (`alt_text`).
+    - **Content Archetype Optimizations**:
+      - **Affiliate Product**: Mandatory disclosure (`#ad #affiliate`), preserved affiliate destination URLs, strict non-fabrication of unverified prices/claims.
+      - **Certification**: Clean visual achievement pins featuring credential URLs and issuing organizations.
+      - **Teaching / Masterclass**: Tutorial titles, key educational objectives, guide URLs, and non-spam keyword tags.
+      - **Project / Portfolio**: Project titles, tech stack keywords, and editorial portfolio links.
+12. **Content Calendar & Automated Scheduler**: Universal background publishing dispatching through provider registry with idempotency, grace periods, and retry queues.
 
 ---
 
-## 🔑 LinkedIn Integration Setup & Developer Guide
+## 📌 Pinterest Integration Setup & Developer Guide
 
-### 1. LinkedIn Developer Portal Configuration
-1. Log into the [LinkedIn Developer Portal](https://www.linkedin.com/developers/).
-2. Create an App linked to your LinkedIn Page.
-3. Under the **Products** tab, request access to:
-   - **Sign In with LinkedIn using OpenID Connect**
-   - **Share on LinkedIn**
-   - **Community Management API** (for organization posting permissions)
-4. Under **Auth Settings**, configure Redirect URIs:
-   - `http://localhost:3000/api/integrations/linkedin/callback` (Local Development)
-   - `https://yourdomain.com/api/integrations/linkedin/callback` (Production)
+### 1. Pinterest Developer Console Configuration
+1. Log into the [Pinterest Developer Console](https://developers.pinterest.com/).
+2. Create an App under your Business account.
+3. Under **OAuth Settings**, configure Redirect URIs:
+   - `http://localhost:3000/api/integrations/pinterest/callback` (Local Development)
+   - `https://yourdomain.com/api/integrations/pinterest/callback` (Production)
+4. Enable App Scopes:
+   - `user_accounts:read`: Read user profile
+   - `boards:read`: Retrieve account boards
+   - `boards:write`: Create or manage boards
+   - `pins:read`: Access Pin metrics and details
+   - `pins:write`: Create image Pins
 
 ### 2. Environment Variables
 Add the following to `.env`:
 ```env
-LINKEDIN_CLIENT_ID="your-linkedin-client-id"
-LINKEDIN_CLIENT_SECRET="your-linkedin-client-secret"
-LINKEDIN_REDIRECT_URI="http://localhost:3000/api/integrations/linkedin/callback"
-LINKEDIN_API_VERSION="202604"
-LINKEDIN_TOKEN_ENCRYPTION_KEY="0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+PINTEREST_APP_ID="your-pinterest-app-id"
+PINTEREST_APP_SECRET="your-pinterest-app-secret"
+PINTEREST_REDIRECT_URI="http://localhost:3000/api/integrations/pinterest/callback"
 ```
 
-### 3. Required Permissions & Scopes
-- `openid`: Basic profile authentication
-- `profile`: Full name and profile picture URL
-- `email`: Member email address
-- `w_member_social`: Post on behalf of individual member profiles
-- `w_organization_social`: Post on behalf of company pages (requires organization admin permissions)
-
-### 4. Known LinkedIn API Approvals & Restrictions
-- **Member vs Organization Posting**: Member posting works out of the box with standard Share scope. Organization posting requires the company page admin to grant access during OAuth consent.
-- **Analytics Restrictions**: LinkedIn Analytics requires special product approval from LinkedIn for `r_organization_social` or `r_member_social_analytics`. The platform analytics adapter (`LinkedInAnalyticsAdapter`) returns a truthful permission-required state without fabricating metrics.
+### 3. Analytics Limitations & Permissions
+- Pinterest Analytics (`PinterestAnalyticsAdapter`) queries `GET /v5/pins/{pin_id}/analytics`.
+- Requires `pins:read` scope approval. If permission is missing, the adapter returns a truthful `available: false` message without fabricating metrics.
 
 ---
 
@@ -91,7 +94,7 @@ LINKEDIN_TOKEN_ENCRYPTION_KEY="0123456789abcdef0123456789abcdef0123456789abcdef0
 - **Database & ORM**: PostgreSQL & Prisma ORM v7
 - **Background Queues & Workers**: Redis & BullMQ
 - **Auth & Storage**: Supabase SSR Auth & Supabase Storage
-- **Testing**: Vitest (143 unit, integration, and E2E tests)
+- **Testing**: Vitest (168 unit, integration, and E2E tests)
 
 ---
 

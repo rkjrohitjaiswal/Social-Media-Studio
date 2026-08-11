@@ -2,8 +2,8 @@ import { SocialPlatform, SocialPlatformProvider } from "../types";
 import { InstagramAdapter } from "./instagram-provider";
 import { LinkedInProvider } from "./linkedin-provider";
 import { ThreadsProvider } from "./threads-provider";
+import { PinterestProvider } from "./pinterest-provider";
 import {
-  PinterestProvider,
   FacebookProvider,
   TikTokProvider,
   YouTubeProvider,
