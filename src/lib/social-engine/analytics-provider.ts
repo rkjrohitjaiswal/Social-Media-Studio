@@ -56,6 +56,18 @@ export class InstagramAnalyticsAdapter implements SocialPlatformAnalyticsProvide
   }
 }
 
+export class LinkedInAnalyticsAdapter implements SocialPlatformAnalyticsProvider {
+  readonly platform = "LINKEDIN" as const;
+
+  async getMediaAnalytics(): Promise<AnalyticsResponse> {
+    return {
+      available: false,
+      message:
+        "LinkedIn analytics requires 'r_organization_social' or 'r_member_social_analytics' permission approval from the LinkedIn Developer Portal.",
+    };
+  }
+}
+
 export class GenericUnsupportedAnalyticsProvider implements SocialPlatformAnalyticsProvider {
   readonly platform: SocialPlatform;
 
@@ -76,6 +88,7 @@ export class UniversalAnalyticsProvider {
 
   constructor() {
     this.providers.set("INSTAGRAM", new InstagramAnalyticsAdapter());
+    this.providers.set("LINKEDIN", new LinkedInAnalyticsAdapter());
   }
 
   getProvider(platform: SocialPlatform): SocialPlatformAnalyticsProvider {

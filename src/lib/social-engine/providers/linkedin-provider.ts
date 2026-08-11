@@ -8,6 +8,7 @@ import {
 } from "../types";
 import { getPlatformCapabilities } from "../capability-registry";
 import { decryptSecret } from "../../security/encryption";
+import { socialAccountService } from "../account-service";
 
 const LINKEDIN_API = "https://api.linkedin.com";
 const LINKEDIN_VERSION = process.env.LINKEDIN_API_VERSION || "202604";
@@ -19,13 +20,25 @@ function isPrivateIpv4(address: string): boolean {
     return false;
   }
   const [a, b] = parts;
-  return a === 10 || a === 127 || a === 0 || (a === 169 && b === 254) ||
-    (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168);
+  return (
+    a === 10 ||
+    a === 127 ||
+    a === 0 ||
+    (a === 169 && b === 254) ||
+    (a === 172 && b >= 16 && b <= 31) ||
+    (a === 192 && b === 168)
+  );
 }
 
 function isPrivateIpv6(address: string): boolean {
   const normalized = address.toLowerCase();
-  return normalized === "::1" || normalized === "::" || normalized.startsWith("fc") || normalized.startsWith("fd") || normalized.startsWith("fe80:");
+  return (
+    normalized === "::1" ||
+    normalized === "::" ||
+    normalized.startsWith("fc") ||
+    normalized.startsWith("fd") ||
+    normalized.startsWith("fe80:")
+  );
 }
 
 async function assertSafeRemoteUrl(rawUrl: string): Promise<URL> {
@@ -41,7 +54,12 @@ async function assertSafeRemoteUrl(rawUrl: string): Promise<URL> {
   }
 
   const hostname = url.hostname.toLowerCase();
-  if (hostname === "localhost" || hostname.endsWith(".localhost") || hostname === "metadata.google.internal" || hostname === "169.254.169.254") {
+  if (
+    hostname === "localhost" ||
+    hostname.endsWith(".localhost") ||
+    hostname === "metadata.google.internal" ||
+    hostname === "169.254.169.254"
+  ) {
     throw new Error("LinkedIn media URL points to a blocked host");
   }
 
@@ -53,14 +71,7 @@ async function assertSafeRemoteUrl(rawUrl: string): Promise<URL> {
   return url;
 }
 
-function getAccessToken(account: SocialAccountData): string {
-  if (!account.encryptedAccessToken) {
-    throw new Error("LinkedIn account has no encrypted access token");
-  }
-  return decryptSecret(account.encryptedAccessToken);
-}
-
-function getAuthorUrn(account: SocialAccountData): string {
+export function getAuthorUrn(account: SocialAccountData): string {
   const metadata = account.metadataJson;
   const metadataUrn = typeof metadata?.authorUrn === "string" ? metadata.authorUrn : undefined;
   if (metadataUrn?.startsWith("urn:li:")) return metadataUrn;
@@ -92,12 +103,89 @@ export class LinkedInProvider implements SocialPlatformProvider {
     };
   }
 
+  /**
+   * Retrieves access token, checking expiration and refreshing if possible.
+   * Marks account as REAUTH_REQUIRED if token is expired and cannot be refreshed.
+   */
+  async getValidAccessToken(account: SocialAccountData): Promise<string> {
+    if (!account.encryptedAccessToken) {
+      await socialAccountService.updateAccountStatus(account.id, account.workspaceId, "REAUTH_REQUIRED");
+      throw new Error("LinkedIn account has no encrypted access token. Re-authentication required.");
+    }
+
+    const currentToken = decryptSecret(account.encryptedAccessToken);
+    const now = Date.now();
+    const isExpired = account.tokenExpiresAt && account.tokenExpiresAt.getTime() - now < 5 * 60 * 1000; // 5 min buffer
+
+    if (!isExpired) {
+      return currentToken;
+    }
+
+    // Token is expired; attempt refresh if refresh token exists
+    if (!account.encryptedRefreshToken) {
+      await socialAccountService.updateAccountStatus(account.id, account.workspaceId, "REAUTH_REQUIRED");
+      throw new Error("LinkedIn access token expired and no refresh token available. Re-authentication required.");
+    }
+
+    try {
+      const refreshToken = decryptSecret(account.encryptedRefreshToken);
+      const clientId = process.env.LINKEDIN_CLIENT_ID || "your-linkedin-client-id";
+      const clientSecret = process.env.LINKEDIN_CLIENT_SECRET || "your-linkedin-client-secret";
+
+      const body = new URLSearchParams({
+        grant_type: "refresh_token",
+        refresh_token: refreshToken,
+        client_id: clientId,
+        client_secret: clientSecret,
+      });
+
+      const response = await fetch("https://www.linkedin.com/oauth/v2/accessToken", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: body.toString(),
+        cache: "no-store",
+      });
+
+      if (!response.ok) {
+        await socialAccountService.updateAccountStatus(account.id, account.workspaceId, "REAUTH_REQUIRED");
+        throw new Error(`LinkedIn token refresh failed with status ${response.status}. Re-authentication required.`);
+      }
+
+      const data = (await response.json()) as {
+        access_token: string;
+        expires_in?: number;
+        refresh_token?: string;
+      };
+
+      const newAccessToken = data.access_token;
+      const newRefreshToken = data.refresh_token || refreshToken;
+      const newExpiry = data.expires_in ? new Date(now + data.expires_in * 1000) : undefined;
+
+      await socialAccountService.updateAccountTokens(account.id, account.workspaceId, {
+        accessToken: newAccessToken,
+        refreshToken: newRefreshToken,
+        tokenExpiresAt: newExpiry,
+      });
+
+      return newAccessToken;
+    } catch (err: unknown) {
+      await socialAccountService.updateAccountStatus(account.id, account.workspaceId, "REAUTH_REQUIRED");
+      const msg = err instanceof Error ? err.message : "LinkedIn token refresh failed";
+      throw new Error(`LinkedIn token refresh failed: ${msg}`);
+    }
+  }
+
   async verifyConnection(account: SocialAccountData): Promise<boolean> {
+    if (account.status === "REAUTH_REQUIRED" || account.status === "DISCONNECTED") {
+      return false;
+    }
+
     if (!this.realApiEnabled()) return account.status === "CONNECTED";
 
     try {
+      const token = await this.getValidAccessToken(account);
       const response = await fetch(`${LINKEDIN_API}/v2/userinfo`, {
-        headers: { Authorization: `Bearer ${getAccessToken(account)}` },
+        headers: { Authorization: `Bearer ${token}` },
         cache: "no-store",
       });
       return response.ok;
@@ -159,11 +247,26 @@ export class LinkedInProvider implements SocialPlatformProvider {
   }
 
   async publish(params: PublishParams): Promise<PublishResult> {
+    // 1. Check human approval guard
     if (params.content.approvalStatus !== "APPROVED") {
       return {
         success: false,
         errorMessage: "LinkedIn publishing requires human approval before publishing",
       };
+    }
+
+    // 2. Check organization permission guard
+    const accountType = (params.account.accountType || "").toUpperCase();
+    if (accountType === "ORGANIZATION" || accountType === "PAGE") {
+      const metadata = params.account.metadataJson;
+      const hasOrgPermission = metadata?.hasOrganizationPermission === true;
+      if (!hasOrgPermission) {
+        return {
+          success: false,
+          errorMessage:
+            "LinkedIn organization publishing requires authorized organization management permissions (w_organization_social).",
+        };
+      }
     }
 
     if (!this.realApiEnabled()) {
@@ -177,7 +280,7 @@ export class LinkedInProvider implements SocialPlatformProvider {
     }
 
     try {
-      const accessToken = getAccessToken(params.account);
+      const accessToken = await this.getValidAccessToken(params.account);
       const author = getAuthorUrn(params.account);
       const commentary = params.content.caption?.trim() || params.content.description?.trim() || "";
       if (!commentary) {
@@ -197,9 +300,18 @@ export class LinkedInProvider implements SocialPlatformProvider {
         isReshareDisabledByAuthor: false,
       };
 
+      // Support Article/Link post or Image post
       if (params.mediaUrl) {
         const imageUrn = await this.uploadImage(accessToken, author, params.mediaUrl);
         body.content = { media: { id: imageUrn } };
+      } else if (params.content.destinationUrl) {
+        body.content = {
+          article: {
+            source: params.content.destinationUrl,
+            title: params.content.title || commentary.slice(0, 100),
+            description: params.content.description || "",
+          },
+        };
       }
 
       const response = await fetch(`${LINKEDIN_API}/rest/posts`, {
@@ -210,9 +322,11 @@ export class LinkedInProvider implements SocialPlatformProvider {
 
       if (!response.ok) {
         const errorText = await response.text().catch(() => "");
+        const status = response.status;
+        const isRetryable = status >= 500 || status === 429;
         return {
           success: false,
-          errorMessage: `LinkedIn publish failed (${response.status})${errorText ? `: ${errorText.slice(0, 500)}` : ""}`,
+          errorMessage: `LinkedIn publish failed (${status})${isRetryable ? " [Retryable]" : " [Fatal]"}: ${errorText.slice(0, 400)}`,
         };
       }
 

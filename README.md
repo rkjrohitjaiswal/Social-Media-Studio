@@ -6,9 +6,28 @@ AI Social Media Studio is an enterprise-grade social content engine built with *
 
 ---
 
-## 🚀 Completed Milestones (Milestones 1–13)
+## 🌟 Platform Live / Stub Matrix
 
-This repository includes the complete implementation of **Milestones 1 through 13**:
+| Platform | Integration Status | Auth Flow | Publishing | Analytics |
+| :--- | :--- | :--- | :--- | :--- |
+| **Instagram** | **LIVE** | OAuth 2.0 (Meta Graph API) | Live Graph API | Live Insights API |
+| **LinkedIn** | **LIVE** | OAuth 2.0 (LinkedIn REST API) | Live Posts & Image Upload API | Permission Guarded |
+| **Threads** | **MOCK/STUB** | Stub Account Service | Mock Engine | Stub |
+| **Pinterest** | **MOCK/STUB** | Stub Account Service | Mock Engine | Stub |
+| **Facebook** | **MOCK/STUB** | Stub Account Service | Mock Engine | Stub |
+| **TikTok** | **MOCK/STUB** | Stub Account Service | Mock Engine | Stub |
+| **YouTube** | **MOCK/STUB** | Stub Account Service | Mock Engine | Stub |
+| **X (Twitter)** | **MOCK/STUB** | Stub Account Service | Mock Engine | Stub |
+| **Reddit** | **MOCK/STUB** | Stub Account Service | Mock Engine | Stub |
+| **Telegram** | **MOCK/STUB** | Stub Account Service | Mock Engine | Stub |
+| **Bluesky** | **MOCK/STUB** | Stub Account Service | Mock Engine | Stub |
+| **Google Business** | **MOCK/STUB** | Stub Account Service | Mock Engine | Stub |
+| **Mastodon** | **MOCK/STUB** | Stub Account Service | Mock Engine | Stub |
+| **Discord** | **MOCK/STUB** | Stub Account Service | Mock Engine | Stub |
+
+---
+
+## 🚀 Completed Implementation Features
 
 1. **Brand Identity Engine**: Multiple brand personas, luxury visual anchors, tone of voice, guidelines, and custom CTA defaults.
 2. **1:N Batch Asset Generation**: Multi-image product input processing with style-vector reference anchors.
@@ -17,18 +36,51 @@ This repository includes the complete implementation of **Milestones 1 through 1
 5. **AI Quality Assessment Engine**: Multi-dimensional vision evaluation (lighting, style consistency, composition, product fidelity) with scoring and feedback.
 6. **Multi-Version Regeneration**: Version-tracked asset iterations with custom prompt adjustments and prompt history.
 7. **Human Governance & Approval Inbox**: Multi-stage approval workflow (`PENDING`, `APPROVED`, `CHANGES_REQUESTED`, `REJECTED`) with approval isolation.
-8. **Instagram Account Management**: Meta Graph API OAuth connection with AES-256-GCM encrypted token storage.
-9. **Direct Instagram Publishing**: Container creation, media publishing, status polling, and error categorization.
-10. **Content Calendar & Automated Scheduler**: Cron worker scheduler with grace periods, idempotency, and timezone handling.
-11. **Instagram Performance Intelligence**: Media & account insights, engagement rate computation, and analytics dashboards.
-12. **n8n Webhook & Event Integration**: Fire-and-forget async webhook pipeline with HMAC-SHA256 signatures, retry exponential backoff, and delivery tracking.
-13. **Multi-Platform Social Engine & Multi-Account Management**:
-    - `SocialPlatformProvider` adapter architecture supporting 14 platforms (Instagram, LinkedIn, Threads, Pinterest, Facebook, TikTok, YouTube, X, Reddit, Telegram, Bluesky, Google Business, Mastodon, Discord).
-    - Multi-account management per workspace (`workspaceId + platform + externalAccountId` isolation).
-    - Specialized Content Archetypes: **Affiliate Product** (strict price/claim guardrails + mandatory `#ad` disclosure), **Certification**, **Teaching / Masterclass**, **Project / Portfolio**, **Personal Brand**, **Announcement**, and **General Post**.
-    - Dedicated platform-specific AI prompt strategies and Zod validation rules.
-    - Universal Calendar with platform/account filters and bulk scheduling.
-    - Universal Publishing Service and Analytics Provider abstractions.
+8. **Instagram Production Integration**: Meta Graph API OAuth connection with AES-256-GCM encrypted token storage.
+9. **LinkedIn Production Integration**:
+   - **OAuth 2.0 Authorization Flow**: Endpoints at `/api/integrations/linkedin/connect`, `/api/integrations/linkedin/callback`, `/api/integrations/linkedin/disconnect` with HMAC signed state CSRF protection.
+   - **User Info Identity Resolution**: OpenID Connect identity retrieval (`https://api.linkedin.com/v2/userinfo`).
+   - **Token Encryption & Automatic Refresh**: AES-256-GCM encrypted access and refresh token storage. Automatic token expiration detection and refresh exchange at `https://www.linkedin.com/oauth/v2/accessToken`. Automatic fallback to `REAUTH_REQUIRED` status when refresh tokens are revoked or expired.
+   - **LinkedIn Posts API (REST API v202604)**: Direct text, image (`/rest/images?action=initializeUpload`), and article link publishing.
+   - **Member & Organization Posting Guards**: Support for person (`urn:li:person:...`) and organization (`urn:li:organization:...`) posting with permission checks (`w_organization_social`).
+10. **Content Calendar & Automated Scheduler**: Universal background publishing dispatching through provider registry with idempotency, grace periods, and retry queues.
+11. **Content Archetypes**: **Affiliate Product** (strict claim guardrails + mandatory `#ad` disclosure), **Certification** (skills learned, issuing organization, credential links), **Teaching / Masterclass**, **Project / Portfolio**, **Personal Brand**, **Announcement**, and **General Post**.
+
+---
+
+## 🔑 LinkedIn Integration Setup & Developer Guide
+
+### 1. LinkedIn Developer Portal Configuration
+1. Log into the [LinkedIn Developer Portal](https://www.linkedin.com/developers/).
+2. Create an App linked to your LinkedIn Page.
+3. Under the **Products** tab, request access to:
+   - **Sign In with LinkedIn using OpenID Connect**
+   - **Share on LinkedIn**
+   - **Community Management API** (for organization posting permissions)
+4. Under **Auth Settings**, configure Redirect URIs:
+   - `http://localhost:3000/api/integrations/linkedin/callback` (Local Development)
+   - `https://yourdomain.com/api/integrations/linkedin/callback` (Production)
+
+### 2. Environment Variables
+Add the following to `.env`:
+```env
+LINKEDIN_CLIENT_ID="your-linkedin-client-id"
+LINKEDIN_CLIENT_SECRET="your-linkedin-client-secret"
+LINKEDIN_REDIRECT_URI="http://localhost:3000/api/integrations/linkedin/callback"
+LINKEDIN_API_VERSION="202604"
+LINKEDIN_TOKEN_ENCRYPTION_KEY="0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+```
+
+### 3. Required Permissions & Scopes
+- `openid`: Basic profile authentication
+- `profile`: Full name and profile picture URL
+- `email`: Member email address
+- `w_member_social`: Post on behalf of individual member profiles
+- `w_organization_social`: Post on behalf of company pages (requires organization admin permissions)
+
+### 4. Known LinkedIn API Approvals & Restrictions
+- **Member vs Organization Posting**: Member posting works out of the box with standard Share scope. Organization posting requires the company page admin to grant access during OAuth consent.
+- **Analytics Restrictions**: LinkedIn Analytics requires special product approval from LinkedIn for `r_organization_social` or `r_member_social_analytics`. The platform analytics adapter (`LinkedInAnalyticsAdapter`) returns a truthful permission-required state without fabricating metrics.
 
 ---
 
@@ -39,127 +91,24 @@ This repository includes the complete implementation of **Milestones 1 through 1
 - **Database & ORM**: PostgreSQL & Prisma ORM v7
 - **Background Queues & Workers**: Redis & BullMQ
 - **Auth & Storage**: Supabase SSR Auth & Supabase Storage
-- **Styling**: Vanilla CSS tokens & TailwindCSS utilities (Obsidian, Warm Ivory, Champagne Gold aesthetics)
-- **Validation**: Zod
-- **Testing**: Vitest (129 unit, integration, and E2E tests)
+- **Testing**: Vitest (143 unit, integration, and E2E tests)
 
 ---
 
-## 📁 Repository Structure
+## ⚡ Quick Start
 
-```
-├── prisma/
-│   ├── schema.prisma         # Complete PostgreSQL schema (14 platforms, accounts, campaigns, n8n)
-│   └── config.ts             # Prisma configuration
-├── src/
-│   ├── app/
-│   │   ├── (auth)/           # Login, Signup, Forgot Password routes
-│   │   ├── (marketing)/      # Public landing & pricing pages
-│   │   ├── (studio)/         # Studio dashboard, Create, Campaigns, Review, Calendar, Analytics, Settings
-│   │   └── api/              # RESTful API endpoints (Campaigns, Integrations, Analytics, n8n)
-│   ├── components/
-│   │   ├── icons/            # Platform & UI SVG icons
-│   │   ├── layout/           # StudioLayout sidebar & navigation
-│   │   └── studio/           # Bulk uploader, cards, modals
-│   ├── lib/
-│   │   ├── ai/               # OpenAI vision, image, and copy providers
-│   │   ├── instagram/        # Legacy Meta Instagram Graph API providers
-│   │   ├── integrations/     # n8n webhook event dispatcher & signature verification
-│   │   ├── queue/            # BullMQ background workers (Generation, Scheduler, Webhooks)
-│   │   ├── security/         # AES-256-GCM token encryption & HMAC signature helpers
-│   │   ├── social-engine/    # Multi-Platform Engine (Providers, Strategies, Validation, Publishing, Accounts)
-│   │   └── studio-context.tsx# React Studio Provider state
-│   └── __tests__/            # Complete Vitest test suite (13 test files, 129 tests)
-├── .env.example              # Environment variables template
-├── eslint.config.mjs         # ESLint configuration
-├── next.config.ts            # Next.js configuration
-├── package.json              # Project dependencies & scripts
-└── tsconfig.json             # TypeScript configuration
-```
-
----
-
-## ⚡ Quick Start & Local Development
-
-### 1. Prerequisites
-- **Node.js**: v18.0.0 or higher
-- **PostgreSQL**: Local instance or remote URL
-- **Redis**: Local instance or remote URL
-- **Supabase Account**: (Optional for local mock mode; required for live Auth/Storage)
-
-### 2. Installation
 ```bash
-# Clone the repository
-git clone https://github.com/rkjrohitjaiswal/Social-Media-Studio.git
-cd Social-Media-Studio
-
 # Install dependencies
 npm install
-```
 
-### 3. Environment Setup
-Copy `.env.example` to `.env`:
-```bash
-cp .env.example .env
-```
-Fill in required credentials or use local development defaults.
-
-### 4. Database Setup
-```bash
-# Validate Prisma schema
+# Run database setup
 npx prisma validate
-
-# Generate Prisma client
 npx prisma generate
-
-# Apply database migrations (or push schema)
 npx prisma db push
-```
 
-### 5. Running the Application
-```bash
-# Start Next.js development server
+# Start development server
 npm run dev
-```
-Open [http://localhost:3000](http://localhost:3000) in your browser.
 
----
-
-## 🧪 Testing & Quality Assurance
-
-Run the complete test suite:
-```bash
-# Run all Vitest unit, integration, and E2E tests
+# Run full test suite
 npm test
-
-# Run TypeScript type check
-npx tsc --noEmit
-
-# Run ESLint check
-npm run lint
-
-# Build production bundle
-npm run build
 ```
-
-### Opt-In Real API Testing
-By default, all external network calls (OpenAI, Meta, LinkedIn, n8n, etc.) are mocked during test execution to prevent unauthenticated network calls. To opt into real API testing, enable the respective environment flags in `.env`:
-```env
-RUN_REAL_OPENAI_TEST="true"
-RUN_REAL_INSTAGRAM_TEST="true"
-RUN_REAL_LINKEDIN_TEST="true"
-```
-
----
-
-## 🔒 Security & Privacy
-
-- **Token Encryption**: All access tokens and refresh tokens are encrypted at rest using AES-256-GCM (`INSTAGRAM_TOKEN_ENCRYPTION_KEY`). Plaintext secrets are **never** logged or returned to client applications.
-- **Workspace Isolation**: Database relationships enforce workspace scoping across all accounts, campaigns, media assets, and scheduled publications.
-- **n8n Webhook Security**: Webhook payloads are signed using HMAC-SHA256 with secret keys, timestamp tolerance verification, and automatic credential sanitization.
-
----
-
-## 📄 License
-
-This project is licensed under the MIT License.

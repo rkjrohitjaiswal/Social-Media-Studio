@@ -200,6 +200,31 @@ export class SocialAccountService {
     }
     return null;
   }
+
+  async updateAccountTokens(
+    id: string,
+    workspaceId: string,
+    params: {
+      accessToken: string;
+      refreshToken?: string;
+      tokenExpiresAt?: Date;
+    }
+  ): Promise<SafeSocialAccount | null> {
+    const acc = accountsStore.find((a) => a.id === id && a.workspaceId === workspaceId);
+    if (acc) {
+      acc.encryptedAccessToken = encryptSecret(params.accessToken);
+      if (params.refreshToken) {
+        acc.encryptedRefreshToken = encryptSecret(params.refreshToken);
+      }
+      if (params.tokenExpiresAt) {
+        acc.tokenExpiresAt = params.tokenExpiresAt;
+      }
+      acc.status = "CONNECTED";
+      acc.updatedAt = new Date();
+      return sanitizeAccount(acc);
+    }
+    return null;
+  }
 }
 
 export const socialAccountService = new SocialAccountService();
