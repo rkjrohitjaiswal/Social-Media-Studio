@@ -1,0 +1,346 @@
+"use client";
+
+import React, { createContext, useContext, useState } from "react";
+import {
+  Brand,
+  Campaign,
+  GeneratedAsset,
+  INITIAL_BRANDS,
+  MOCK_CAMPAIGNS,
+  MOCK_SCHEDULED_POSTS,
+  ScheduledPost,
+} from "./mock-data";
+
+interface StudioContextType {
+  brands: Brand[];
+  activeBrand: Brand;
+  setActiveBrand: (brand: Brand) => void;
+  addBrand: (brand: Brand) => void;
+  updateBrand: (brand: Brand) => void;
+  campaigns: Campaign[];
+  activeCampaign: Campaign | null;
+  setActiveCampaignId: (id: string) => void;
+  createCampaign: (data: {
+    name: string;
+    description: string;
+    brandId: string;
+    referenceAssetUrl: string;
+    inputAssetUrls: string[];
+    aspectRatio: string;
+    aiCreativity: number;
+    customPromptOverride?: string;
+  }) => string;
+  approveAsset: (assetId: string) => void;
+  rejectAsset: (assetId: string, reason?: string) => void;
+  updateAssetCopy: (
+    assetId: string,
+    copy: { text: string; cta: string; altText: string; hashtags: string[] }
+  ) => void;
+  regenerateAssetVersion: (assetId: string, customPrompt: string) => void;
+  scheduledPosts: ScheduledPost[];
+  scheduleAssetToInstagram: (assetId: string, dateIso: string) => void;
+  notifications: { id: string; title: string; time: string; read: boolean }[];
+  markNotificationsRead: () => void;
+}
+
+const StudioContext = createContext<StudioContextType | undefined>(undefined);
+
+export function StudioProvider({ children }: { children: React.ReactNode }) {
+  const [brands, setBrands] = useState<Brand[]>(INITIAL_BRANDS);
+  const [activeBrand, setActiveBrand] = useState<Brand>(INITIAL_BRANDS[0]);
+  const [campaigns, setCampaigns] = useState<Campaign[]>(MOCK_CAMPAIGNS);
+  const [activeCampaignId, setActiveCampaignId] = useState<string>("camp-101");
+  const [scheduledPosts, setScheduledPosts] = useState<ScheduledPost[]>(MOCK_SCHEDULED_POSTS);
+  const [notifications, setNotifications] = useState([
+    {
+      id: "n-1",
+      title: "Batch Generation Completed: 4/4 Assets Ready for Review",
+      time: "10m ago",
+      read: false,
+    },
+    {
+      id: "n-2",
+      title: "Instagram Post Published: Spring High Couture 2026",
+      time: "2h ago",
+      read: false,
+    },
+    {
+      id: "n-3",
+      title: "Quality Score Alert: Asset gen-2 scored 94.0",
+      time: "4h ago",
+      read: true,
+    },
+  ]);
+
+  const activeCampaign = campaigns.find((c) => c.id === activeCampaignId) || campaigns[0] || null;
+
+  const addBrand = (newBrand: Brand) => {
+    setBrands((prev) => [...prev, newBrand]);
+    setActiveBrand(newBrand);
+  };
+
+  const updateBrand = (updatedBrand: Brand) => {
+    setBrands((prev) => prev.map((b) => (b.id === updatedBrand.id ? updatedBrand : b)));
+    if (activeBrand.id === updatedBrand.id) {
+      setActiveBrand(updatedBrand);
+    }
+  };
+
+  const createCampaign = (data: {
+    name: string;
+    description: string;
+    brandId: string;
+    referenceAssetUrl: string;
+    inputAssetUrls: string[];
+    aspectRatio: string;
+    aiCreativity: number;
+    customPromptOverride?: string;
+  }): string => {
+    const newId = `camp-${Date.now().toString().slice(-4)}`;
+    
+    // Construct generated assets based on inputs
+    const generatedAssets: GeneratedAsset[] = data.inputAssetUrls.map((inputUrl, idx) => {
+      const gId = `gen-${Date.now()}-${idx}`;
+      return {
+        id: gId,
+        campaignId: newId,
+        inputAsset: {
+          id: `in-${Date.now()}-${idx}`,
+          url: inputUrl,
+          fileName: `input-product-${idx + 1}.jpg`,
+          mimeType: "image/jpeg",
+          width: 800,
+          height: 1000,
+        },
+        currentVersion: {
+          id: `v-${gId}-1`,
+          versionNumber: 1,
+          url: inputUrl, // Will update during simulated processing
+          promptUsed: data.customPromptOverride || `Editorial luxury presentation matching reference aesthetic with warm golden hour lighting and dark shadows.`,
+          qualityScore: Math.floor(Math.random() * 8) + 91, // 91-98
+          qualityReport: {
+            lighting: 96,
+            styleConsistency: 94,
+            clarity: 97,
+            brandAlignment: 95,
+            feedback: "Perfect style vector alignment with reference image.",
+          },
+          createdAt: new Date().toISOString(),
+        },
+        versions: [],
+        caption: {
+          text: `Haute couture luxury piece for ${activeBrand.name}. Sculpted with timeless elegance and precision craftsmanship.`,
+          cta: `Discover the exclusive collection online now.`,
+          altText: `Luxury product presented in dramatic editorial studio lighting.`,
+        },
+        hashtags: [`#${activeBrand.name.replace(/\s+/g, "")}`, "#HauteCouture", "#LuxuryEditorial", "#AW26"],
+        status: "PENDING",
+        createdAt: new Date().toISOString(),
+      };
+    });
+
+    const newCampaign: Campaign = {
+      id: newId,
+      brandId: data.brandId,
+      name: data.name,
+      description: data.description,
+      status: "PROCESSING",
+      progressPercent: 15,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      referenceAsset: {
+        id: `ref-${newId}`,
+        url: data.referenceAssetUrl,
+        fileName: "reference-style-anchor.jpg",
+        mimeType: "image/jpeg",
+        width: 1200,
+        height: 1500,
+        isReference: true,
+      },
+      inputAssets: data.inputAssetUrls.map((url, i) => ({
+        id: `in-${newId}-${i}`,
+        url,
+        fileName: `input-product-${i + 1}.jpg`,
+        mimeType: "image/jpeg",
+        width: 800,
+        height: 1000,
+      })),
+      generatedAssets,
+    };
+
+    setCampaigns((prev) => [newCampaign, ...prev]);
+    setActiveCampaignId(newId);
+
+    // Simulate real-time progress update
+    let currentProgress = 15;
+    const interval = setInterval(() => {
+      currentProgress += 25;
+      if (currentProgress >= 100) {
+        currentProgress = 100;
+        clearInterval(interval);
+        setCampaigns((prev) =>
+          prev.map((c) =>
+            c.id === newId
+              ? {
+                  ...c,
+                  status: "READY_FOR_REVIEW",
+                  progressPercent: 100,
+                  generatedAssets: c.generatedAssets.map((ga, idx) => ({
+                    ...ga,
+                    currentVersion: {
+                      ...ga.currentVersion,
+                      // Assign high-res generated demonstration images
+                      url: [
+                        "https://images.unsplash.com/photo-1548036328-c9fa89d128fa?q=80&w=1200&auto=format&fit=crop",
+                        "https://images.unsplash.com/photo-1523293182086-7651a899d37f?q=80&w=1200&auto=format&fit=crop",
+                        "https://images.unsplash.com/photo-1511499767150-a48a237f0083?q=80&w=1200&auto=format&fit=crop",
+                        "https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?q=80&w=1200&auto=format&fit=crop",
+                      ][idx % 4],
+                    },
+                  })),
+                }
+              : c
+          )
+        );
+      } else {
+        setCampaigns((prev) =>
+          prev.map((c) => (c.id === newId ? { ...c, progressPercent: currentProgress } : c))
+        );
+      }
+    }, 1500);
+
+    return newId;
+  };
+
+  const approveAsset = (assetId: string) => {
+    setCampaigns((prev) =>
+      prev.map((c) => ({
+        ...c,
+        generatedAssets: c.generatedAssets.map((ga) =>
+          ga.id === assetId ? { ...ga, status: "APPROVED" } : ga
+        ),
+      }))
+    );
+  };
+
+  const rejectAsset = (assetId: string) => {
+    setCampaigns((prev) =>
+      prev.map((c) => ({
+        ...c,
+        generatedAssets: c.generatedAssets.map((ga) =>
+          ga.id === assetId ? { ...ga, status: "REJECTED" } : ga
+        ),
+      }))
+    );
+  };
+
+  const updateAssetCopy = (
+    assetId: string,
+    copy: { text: string; cta: string; altText: string; hashtags: string[] }
+  ) => {
+    setCampaigns((prev) =>
+      prev.map((c) => ({
+        ...c,
+        generatedAssets: c.generatedAssets.map((ga) =>
+          ga.id === assetId
+            ? {
+                ...ga,
+                caption: { text: copy.text, cta: copy.cta, altText: copy.altText },
+                hashtags: copy.hashtags,
+              }
+            : ga
+        ),
+      }))
+    );
+  };
+
+  const regenerateAssetVersion = (assetId: string, customPrompt: string) => {
+    setCampaigns((prev) =>
+      prev.map((c) => ({
+        ...c,
+        generatedAssets: c.generatedAssets.map((ga) => {
+          if (ga.id !== assetId) return ga;
+          const nextVerNum = ga.versions.length + 1;
+          const newVer = {
+            id: `v-${assetId}-${nextVerNum}`,
+            versionNumber: nextVerNum,
+            url: ga.currentVersion.url,
+            promptUsed: customPrompt,
+            qualityScore: 95.8,
+            qualityReport: {
+              lighting: 97,
+              styleConsistency: 96,
+              clarity: 96,
+              brandAlignment: 94,
+              feedback: `Regeneration version ${nextVerNum} created with custom prompt tweaks.`,
+            },
+            createdAt: new Date().toISOString(),
+          };
+          return {
+            ...ga,
+            currentVersion: newVer,
+            versions: [newVer, ...ga.versions],
+          };
+        }),
+      }))
+    );
+  };
+
+  const scheduleAssetToInstagram = (assetId: string, dateIso: string) => {
+    const asset = activeCampaign?.generatedAssets.find((a) => a.id === assetId);
+    if (!asset) return;
+
+    approveAsset(assetId);
+
+    const newSchedule: ScheduledPost = {
+      id: `sched-${Date.now()}`,
+      campaignId: activeCampaign.id,
+      campaignName: activeCampaign.name,
+      assetUrl: asset.currentVersion.url,
+      caption: asset.caption.text,
+      platform: "INSTAGRAM",
+      scheduledAt: dateIso,
+      published: false,
+    };
+
+    setScheduledPosts((prev) => [newSchedule, ...prev]);
+  };
+
+  const markNotificationsRead = () => {
+    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+  };
+
+  return (
+    <StudioContext.Provider
+      value={{
+        brands,
+        activeBrand,
+        setActiveBrand,
+        addBrand,
+        updateBrand,
+        campaigns,
+        activeCampaign,
+        setActiveCampaignId,
+        createCampaign,
+        approveAsset,
+        rejectAsset,
+        updateAssetCopy,
+        regenerateAssetVersion,
+        scheduledPosts,
+        scheduleAssetToInstagram,
+        notifications,
+        markNotificationsRead,
+      }}
+    >
+      {children}
+    </StudioContext.Provider>
+  );
+}
+
+export function useStudio() {
+  const context = useContext(StudioContext);
+  if (!context) {
+    throw new Error("useStudio must be used within a StudioProvider");
+  }
+  return context;
+}

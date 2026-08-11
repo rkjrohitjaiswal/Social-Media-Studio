@@ -1,0 +1,835 @@
+datasource db {
+  provider = "postgresql"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  OWNER
+  ADMIN
+  EDITOR
+  VIEWER
+}
+
+enum CampaignStatus {
+  DRAFT
+  UPLOADING
+  READY
+  PROCESSING
+  COMPLETED
+  FAILED
+  ARCHIVED
+}
+
+enum MediaAssetType {
+  REFERENCE
+  INPUT
+  GENERATED
+}
+
+enum GenerationRunStatus {
+  QUEUED
+  PROCESSING
+  COMPLETED
+  PARTIAL_FAILURE
+  FAILED
+  CANCELLED
+}
+
+enum GenerationJobStatus {
+  QUEUED
+  PROCESSING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum SocialCopyStatus {
+  QUEUED
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum QualityAssessmentStatus {
+  QUEUED
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum QualityVerdict {
+  PASS
+  REVIEW
+  FAIL
+}
+
+enum ReviewEventType {
+  QUALITY_COMPLETED
+  APPROVED
+  REJECTED
+  CHANGES_REQUESTED
+  IMAGE_REGENERATED
+  COPY_REGENERATED
+}
+
+enum InstagramAccountStatus {
+  CONNECTED
+  DISCONNECTED
+  REAUTH_REQUIRED
+  ERROR
+}
+
+enum InstagramPublishStatus {
+  QUEUED
+  PROCESSING
+  PUBLISHED
+  FAILED
+  CANCELLED
+}
+
+enum ScheduledPublicationStatus {
+  DRAFT
+  SCHEDULED
+  PROCESSING
+  PUBLISHED
+  FAILED
+  CANCELLED
+}
+
+enum InstagramErrorCategory {
+  AUTHENTICATION
+  RATE_LIMIT
+  INVALID_MEDIA
+  PERMISSION
+  NETWORK
+  PROVIDER
+  UNKNOWN
+}
+
+enum JobStatus {
+  QUEUED
+  ANALYZING_REFERENCE
+  GENERATING_IMAGE
+  GENERATING_COPY
+  EVALUATING_QUALITY
+  COMPLETED
+  FAILED
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  REVISION_REQUESTED
+}
+
+enum SocialPlatform {
+  INSTAGRAM
+  LINKEDIN
+  THREADS
+  PINTEREST
+  FACEBOOK
+  TIKTOK
+  YOUTUBE
+  X
+  REDDIT
+  TELEGRAM
+  BLUESKY
+  GOOGLE_BUSINESS
+  MASTODON
+  DISCORD
+}
+
+enum SocialAccountStatus {
+  CONNECTED
+  DISCONNECTED
+  REAUTH_REQUIRED
+  ERROR
+  PENDING
+}
+
+enum ContentType {
+  AFFILIATE_PRODUCT
+  CERTIFICATION
+  TEACHING
+  PROJECT
+  PERSONAL_BRAND
+  ANNOUNCEMENT
+  GENERAL
+}
+
+model User {
+  id            String            @id @default(uuid())
+  email         String            @unique
+  fullName      String?
+  avatarUrl     String?
+  supabaseUid   String            @unique
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  memberships   WorkspaceMember[]
+  approvals     Approval[]
+}
+
+model Workspace {
+  id                      String                  @id @default(uuid())
+  name                    String
+  slug                    String                  @unique
+  logoUrl                 String?
+  logoStoragePath         String?
+  createdAt               DateTime                @default(now())
+  updatedAt               DateTime                @updatedAt
+  members                 WorkspaceMember[]
+  brands                  Brand[]
+  campaigns               Campaign[]
+  mediaAssets             MediaAsset[]
+  generationRuns          GenerationRun[]
+  generationJobs          GenerationJob[]
+  socialCopies            SocialCopy[]
+  qualityAssessments      QualityAssessment[]
+  reviewEvents            ReviewEvent[]
+  instagramAccounts       InstagramAccount[]
+  instagramPublications   InstagramPublication[]
+  scheduledPublications  ScheduledPublication[]
+  instagramMediaInsights  InstagramMediaInsight[]
+  instagramAccountInsights InstagramAccountInsight[]
+  socialAccounts          SocialAccount[]
+  platformContents        PlatformContent[]
+  n8nIntegrations         N8nIntegration[]
+  n8nDeliveries           N8nWebhookDelivery[]
+}
+
+model WorkspaceMember {
+  id          String    @id @default(uuid())
+  workspaceId String
+  userId      String
+  role        Role      @default(EDITOR)
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, userId])
+}
+
+model Brand {
+  id                String     @id @default(uuid())
+  workspaceId       String
+  name              String
+  description       String?
+  logoUrl           String?
+  logoStoragePath   String?
+  primaryColor      String     @default("#0B0C0E")
+  secondaryColor    String     @default("#F5F4F0")
+  accentColor       String     @default("#C5A059")
+  toneVoice         String
+  contentStyle      String?
+  targetAudience    String?
+  defaultCta        String?
+  guidelines        String?
+  website           String?
+  instagramUsername String?
+  contactEmail      String?
+  contactPhone      String?
+  workspace         Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  campaigns         Campaign[]
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+}
+
+model Campaign {
+  id                    String                 @id @default(uuid())
+  workspaceId           String
+  brandId               String
+  name                  String
+  description           String?
+  status                CampaignStatus         @default(DRAFT)
+  contentType           ContentType?
+  targetAudience        String?
+  campaignGoal          String?
+  campaignMetadataJson  Json?
+  referenceAssetId      String?                @unique
+  referenceAsset        MediaAsset?            @relation("ReferenceAsset", fields: [referenceAssetId], references: [id], onDelete: SetNull)
+  workspace             Workspace              @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  brand                 Brand                  @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  inputAssets           MediaAsset[]           @relation("CampaignInputAssets")
+  generationRuns        GenerationRun[]
+  generationJobs        GenerationJob[]
+  socialCopies          SocialCopy[]
+  qualityAssessments    QualityAssessment[]
+  reviewEvents          ReviewEvent[]
+  instagramPublications InstagramPublication[]
+  scheduledPublications ScheduledPublication[]
+  platformContents      PlatformContent[]
+  scheduledPosts        ScheduledPost[]
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+
+  @@index([workspaceId])
+  @@index([brandId])
+  @@index([status])
+}
+
+model MediaAsset {
+  id                    String                 @id @default(uuid())
+  workspaceId           String
+  campaignId            String?
+  storagePath           String
+  publicUrl             String?
+  fileName              String
+  mimeType              String
+  fileSizeBytes         Int
+  width                 Int?
+  height                Int?
+  isReference           Boolean                @default(false)
+  assetType             MediaAssetType         @default(INPUT)
+  workspace             Workspace              @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  campaignReference     Campaign?              @relation("ReferenceAsset")
+  campaignInput         Campaign?              @relation("CampaignInputAssets", fields: [campaignId], references: [id], onDelete: Cascade)
+  inputJobs             GenerationJob[]        @relation("JobInputAsset")
+  referenceJobs         GenerationJob[]        @relation("JobReferenceAsset")
+  generatedJobs         GenerationJob[]        @relation("JobGeneratedAsset")
+  socialCopy            SocialCopy?            @relation("AssetSocialCopy")
+  qualityAssessments    QualityAssessment[]    @relation("AssetQualityAssessments")
+  reviewEvents          ReviewEvent[]          @relation("AssetReviewEvents")
+  instagramPublications InstagramPublication[] @relation("AssetInstagramPublications")
+  scheduledPublications ScheduledPublication[] @relation("AssetScheduledPublications")
+  platformContents      PlatformContent[]      @relation("AssetPlatformContents")
+  createdAt             DateTime               @default(now())
+
+  @@index([workspaceId])
+  @@index([campaignId])
+  @@index([isReference])
+  @@index([assetType])
+}
+
+model GenerationRun {
+  id             String              @id @default(uuid())
+  workspaceId    String
+  campaignId     String
+  idempotencyKey String              @unique
+  status         GenerationRunStatus @default(QUEUED)
+  totalJobs      Int                 @default(0)
+  completedJobs  Int                 @default(0)
+  failedJobs     Int                 @default(0)
+  workspace      Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  campaign       Campaign            @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  jobs           GenerationJob[]
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+  startedAt      DateTime?
+  completedAt    DateTime?
+
+  @@index([workspaceId])
+  @@index([campaignId])
+  @@index([status])
+}
+
+model GenerationJob {
+  id               String              @id @default(uuid())
+  workspaceId      String
+  campaignId       String
+  generationRunId  String
+  inputAssetId     String
+  referenceAssetId String
+  generatedAssetId String?             @unique
+  status           GenerationJobStatus @default(QUEUED)
+  attempts         Int                 @default(0)
+  errorMessage     String?
+  openaiRequestId  String?
+  provider         String              @default("openai")
+  modelUsed        String?
+  inputTokens      Int?
+  outputTokens     Int?
+  totalTokens      Int?
+  workspace        Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  generationRun    GenerationRun       @relation(fields: [generationRunId], references: [id], onDelete: Cascade)
+  campaign         Campaign            @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  inputAsset       MediaAsset          @relation("JobInputAsset", fields: [inputAssetId], references: [id])
+  referenceAsset   MediaAsset          @relation("JobReferenceAsset", fields: [referenceAssetId], references: [id])
+  generatedAsset   MediaAsset?         @relation("JobGeneratedAsset", fields: [generatedAssetId], references: [id])
+  socialCopy       SocialCopy?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+  startedAt        DateTime?
+  completedAt      DateTime?
+
+  @@unique([generationRunId, inputAssetId])
+  @@index([workspaceId])
+  @@index([campaignId])
+  @@index([generationRunId])
+  @@index([status])
+}
+
+model SocialCopy {
+  id                    String                 @id @default(uuid())
+  workspaceId           String
+  campaignId            String
+  generationJobId       String                 @unique
+  generatedAssetId      String                 @unique
+  caption               String                 @default("")
+  hashtags              String[]               @default([])
+  cta                   String                 @default("")
+  altText               String                 @default("")
+  status                SocialCopyStatus       @default(QUEUED)
+  approvalStatus        ApprovalStatus         @default(PENDING)
+  currentVersionNumber  Int                    @default(1)
+  provider              String                 @default("openai")
+  modelUsed             String?
+  attempts              Int                    @default(0)
+  errorMessage          String?
+  workspace             Workspace              @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  campaign              Campaign               @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  generationJob         GenerationJob          @relation(fields: [generationJobId], references: [id], onDelete: Cascade)
+  generatedAsset        MediaAsset             @relation("AssetSocialCopy", fields: [generatedAssetId], references: [id], onDelete: Cascade)
+  versions              SocialCopyVersion[]
+  instagramPublication  InstagramPublication[]
+  scheduledPublications ScheduledPublication[]
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+  completedAt           DateTime?
+
+  @@index([workspaceId])
+  @@index([campaignId])
+  @@index([status])
+  @@index([approvalStatus])
+}
+
+model SocialCopyVersion {
+  id            String     @id @default(uuid())
+  socialCopyId  String
+  versionNumber Int
+  caption       String
+  hashtags      String[]
+  cta           String
+  altText       String
+  socialCopy    SocialCopy @relation(fields: [socialCopyId], references: [id], onDelete: Cascade)
+  createdAt     DateTime   @default(now())
+
+  @@unique([socialCopyId, versionNumber])
+}
+
+model QualityAssessment {
+  id                       String                  @id @default(uuid())
+  workspaceId              String
+  campaignId               String
+  generatedAssetId         String
+  overallScore             Int                     @default(0)
+  referenceSimilarityScore Int                     @default(0)
+  brandConsistencyScore    Int                     @default(0)
+  compositionScore         Int                     @default(0)
+  lightingScore            Int                     @default(0)
+  productFidelityScore     Int                     @default(0)
+  technicalQualityScore    Int                     @default(0)
+  verdict                  QualityVerdict          @default(REVIEW)
+  strengths                String[]                @default([])
+  issues                   String[]                @default([])
+  recommendations          String[]                @default([])
+  status                   QualityAssessmentStatus @default(QUEUED)
+  provider                 String                  @default("openai")
+  modelUsed                String?
+  attempts                 Int                     @default(0)
+  errorMessage             String?
+  workspace                Workspace               @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  campaign                 Campaign                @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  generatedAsset           MediaAsset              @relation("AssetQualityAssessments", fields: [generatedAssetId], references: [id], onDelete: Cascade)
+  createdAt                DateTime                @default(now())
+  updatedAt                DateTime                @updatedAt
+  completedAt              DateTime?
+
+  @@index([workspaceId])
+  @@index([campaignId])
+  @@index([generatedAssetId])
+  @@index([status])
+  @@index([verdict])
+}
+
+model ReviewEvent {
+  id               String          @id @default(uuid())
+  workspaceId      String
+  campaignId       String
+  generatedAssetId String
+  userId           String?
+  eventType        ReviewEventType
+  reviewerComment  String?
+  workspace        Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  campaign         Campaign        @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  generatedAsset   MediaAsset      @relation("AssetReviewEvents", fields: [generatedAssetId], references: [id], onDelete: Cascade)
+  createdAt        DateTime        @default(now())
+
+  @@index([workspaceId])
+  @@index([campaignId])
+  @@index([generatedAssetId])
+  @@index([eventType])
+}
+
+model InstagramAccount {
+  id                     String                    @id @default(uuid())
+  workspaceId            String
+  instagramUserId        String                    @unique
+  username               String
+  accountType            String                    @default("PROFESSIONAL")
+  accessTokenEncrypted   String
+  tokenExpiresAt         DateTime?
+  status                 InstagramAccountStatus    @default(CONNECTED)
+  connectedAt            DateTime                  @default(now())
+  updatedAt              DateTime                  @updatedAt
+  workspace              Workspace                 @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  publications           InstagramPublication[]
+  scheduledPosts         ScheduledPublication[]
+  mediaInsights          InstagramMediaInsight[]
+  accountInsights        InstagramAccountInsight[]
+
+  @@index([workspaceId])
+  @@index([status])
+}
+
+model InstagramPublication {
+  id                   String                 @id @default(uuid())
+  workspaceId          String
+  campaignId           String
+  generatedAssetId     String
+  socialCopyId         String
+  instagramAccountId   String
+  status               InstagramPublishStatus @default(QUEUED)
+  instagramMediaId     String?
+  instagramContainerId String?
+  captionSnapshot      String
+  hashtagsSnapshot     String[]               @default([])
+  ctaSnapshot          String                 @default("")
+  publishedAt          DateTime?
+  errorCategory        InstagramErrorCategory?
+  errorMessage         String?
+  workspace            Workspace              @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  campaign             Campaign               @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  generatedAsset       MediaAsset             @relation("AssetInstagramPublications", fields: [generatedAssetId], references: [id], onDelete: Cascade)
+  socialCopy           SocialCopy             @relation(fields: [socialCopyId], references: [id], onDelete: Cascade)
+  instagramAccount     InstagramAccount       @relation(fields: [instagramAccountId], references: [id], onDelete: Cascade)
+  scheduledPublication ScheduledPublication?
+  mediaInsights        InstagramMediaInsight[]
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
+
+  @@index([workspaceId])
+  @@index([campaignId])
+  @@index([generatedAssetId])
+  @@index([status])
+}
+
+model ScheduledPublication {
+  id                     String                     @id @default(uuid())
+  workspaceId            String
+  campaignId             String
+  generatedAssetId       String
+  socialCopyId           String?
+  instagramAccountId     String?
+  instagramPublicationId String?                    @unique
+  platform               SocialPlatform             @default(INSTAGRAM)
+  socialAccountId        String?
+  platformContentId      String?
+  scheduledFor           DateTime
+  timezone               String                     @default("UTC")
+  status                 ScheduledPublicationStatus @default(SCHEDULED)
+  captionSnapshot        String
+  hashtagsSnapshot       String[]                   @default([])
+  ctaSnapshot            String                     @default("")
+  createdByUserId        String?
+  failureReason          String?
+  workspace              Workspace                  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  campaign               Campaign                   @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  generatedAsset         MediaAsset                 @relation("AssetScheduledPublications", fields: [generatedAssetId], references: [id], onDelete: Cascade)
+  socialCopy             SocialCopy?                @relation(fields: [socialCopyId], references: [id], onDelete: Cascade)
+  instagramAccount       InstagramAccount?          @relation(fields: [instagramAccountId], references: [id], onDelete: Cascade)
+  instagramPublication   InstagramPublication?      @relation(fields: [instagramPublicationId], references: [id])
+  socialAccount          SocialAccount?             @relation(fields: [socialAccountId], references: [id], onDelete: SetNull)
+  platformContent        PlatformContent?           @relation(fields: [platformContentId], references: [id], onDelete: SetNull)
+  createdAt              DateTime                   @default(now())
+  updatedAt              DateTime                   @updatedAt
+  publishedAt            DateTime?
+  cancelledAt            DateTime?
+
+  @@index([workspaceId])
+  @@index([campaignId])
+  @@index([generatedAssetId])
+  @@index([instagramAccountId])
+  @@index([socialAccountId])
+  @@index([platformContentId])
+  @@index([platform])
+  @@index([status])
+  @@index([scheduledFor])
+  @@index([status, scheduledFor])
+}
+
+model SocialAccount {
+  id                    String              @id @default(uuid())
+  workspaceId           String
+  platform              SocialPlatform
+  externalAccountId     String
+  username              String?
+  displayName           String?
+  profileImageUrl       String?
+  accountType           String?
+  status                SocialAccountStatus @default(CONNECTED)
+  encryptedAccessToken  String?
+  encryptedRefreshToken String?
+  tokenExpiresAt        DateTime?
+  metadataJson          Json?
+  connectedAt           DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+  createdAt             DateTime            @default(now())
+  workspace             Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  platformContents      PlatformContent[]
+  scheduledPublications ScheduledPublication[]
+
+  @@unique([workspaceId, platform, externalAccountId])
+  @@index([workspaceId])
+  @@index([platform])
+  @@index([status])
+}
+
+model PlatformContent {
+  id                   String                 @id @default(uuid())
+  workspaceId          String
+  campaignId           String?
+  assetId              String?
+  platform             SocialPlatform
+  socialAccountId      String?
+  contentType          ContentType            @default(GENERAL)
+  caption              String?
+  title                String?
+  description          String?
+  hashtagsJson         Json?
+  keywordsJson         Json?
+  cta                  String?
+  altText              String?
+  destinationUrl       String?
+  platformMetadataJson Json?
+  status               String                 @default("DRAFT")
+  approvalStatus       ApprovalStatus         @default(PENDING)
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
+  workspace            Workspace              @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  campaign             Campaign?              @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  asset                MediaAsset?            @relation("AssetPlatformContents", fields: [assetId], references: [id], onDelete: SetNull)
+  socialAccount        SocialAccount?         @relation(fields: [socialAccountId], references: [id], onDelete: SetNull)
+  scheduledPublications ScheduledPublication[]
+
+  @@index([workspaceId])
+  @@index([campaignId])
+  @@index([platform])
+  @@index([approvalStatus])
+}
+
+model InstagramMediaInsight {
+  id                     String               @id @default(uuid())
+  workspaceId            String
+  instagramAccountId     String
+  instagramPublicationId String
+  instagramMediaId       String
+  periodStart            DateTime
+  periodEnd              DateTime
+  impressions            Int                  @default(0)
+  reach                  Int                  @default(0)
+  likes                  Int                  @default(0)
+  comments               Int                  @default(0)
+  saves                  Int                  @default(0)
+  shares                 Int                  @default(0)
+  engagements            Int                  @default(0)
+  engagementRate         Float                @default(0)
+  rawMetricsJson         Json?
+  workspace              Workspace            @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  instagramAccount       InstagramAccount     @relation(fields: [instagramAccountId], references: [id], onDelete: Cascade)
+  instagramPublication   InstagramPublication @relation(fields: [instagramPublicationId], references: [id], onDelete: Cascade)
+  createdAt              DateTime             @default(now())
+  updatedAt              DateTime             @updatedAt
+
+  @@unique([instagramPublicationId, periodStart])
+  @@index([workspaceId])
+  @@index([instagramAccountId])
+  @@index([instagramPublicationId])
+  @@index([instagramMediaId])
+  @@index([periodStart])
+  @@index([periodEnd])
+}
+
+model InstagramAccountInsight {
+  id                 String           @id @default(uuid())
+  workspaceId        String
+  instagramAccountId String
+  periodStart        DateTime
+  periodEnd          DateTime
+  followers          Int              @default(0)
+  followerGrowth     Int              @default(0)
+  impressions        Int              @default(0)
+  reach              Int              @default(0)
+  profileViews       Int              @default(0)
+  websiteClicks      Int              @default(0)
+  totalLikes         Int              @default(0)
+  totalComments      Int              @default(0)
+  totalSaves         Int              @default(0)
+  totalShares        Int              @default(0)
+  engagementRate     Float            @default(0)
+  rawMetricsJson     Json?
+  workspace          Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  instagramAccount   InstagramAccount @relation(fields: [instagramAccountId], references: [id], onDelete: Cascade)
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  @@unique([instagramAccountId, periodStart])
+  @@index([workspaceId])
+  @@index([instagramAccountId])
+  @@index([periodStart])
+  @@index([periodEnd])
+}
+
+model GeneratedAsset {
+  id               String                  @id @default(uuid())
+  campaignId       String
+  jobId            String                  @unique
+  currentVersionId String?                 @unique
+  status           ApprovalStatus          @default(PENDING)
+  versions         GeneratedAssetVersion[]
+  captions         Caption[]
+  hashtagSets      HashtagSet[]
+  approvals        Approval[]
+  scheduledPost    ScheduledPost?
+  publishedPost    PublishedPost?
+  createdAt        DateTime                @default(now())
+  updatedAt        DateTime                @updatedAt
+}
+
+model GeneratedAssetVersion {
+  id               String         @id @default(uuid())
+  generatedAssetId String
+  versionNumber    Int
+  storagePath      String
+  publicUrl        String
+  promptUsed       String
+  stylePreset      String?
+  qualityScore     Float
+  qualityReport    Json
+  generatedAsset   GeneratedAsset @relation(fields: [generatedAssetId], references: [id], onDelete: Cascade)
+  createdAt        DateTime       @default(now())
+}
+
+model Caption {
+  id               String         @id @default(uuid())
+  generatedAssetId String
+  text             String
+  cta              String?
+  altText          String?
+  generatedAsset   GeneratedAsset @relation(fields: [generatedAssetId], references: [id], onDelete: Cascade)
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+}
+
+model HashtagSet {
+  id               String         @id @default(uuid())
+  generatedAssetId String
+  hashtags         String[]
+  generatedAsset   GeneratedAsset @relation(fields: [generatedAssetId], references: [id], onDelete: Cascade)
+  createdAt        DateTime       @default(now())
+}
+
+model Approval {
+  id               String         @id @default(uuid())
+  generatedAssetId String
+  userId           String
+  status           ApprovalStatus
+  feedback         String?
+  generatedAsset   GeneratedAsset @relation(fields: [generatedAssetId], references: [id], onDelete: Cascade)
+  user             User           @relation(fields: [userId], references: [id])
+  createdAt        DateTime       @default(now())
+}
+
+model ScheduledPost {
+  id               String         @id @default(uuid())
+  campaignId       String
+  generatedAssetId String         @unique
+  platform         SocialPlatform @default(INSTAGRAM)
+  scheduledAt      DateTime
+  published        Boolean        @default(false)
+  campaign         Campaign       @relation(fields: [campaignId], references: [id])
+  generatedAsset   GeneratedAsset @relation(fields: [generatedAssetId], references: [id])
+  publishedPost    PublishedPost?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+}
+
+model PublishedPost {
+  id               String              @id @default(uuid())
+  scheduledPostId  String?             @unique
+  generatedAssetId String              @unique
+  platform         SocialPlatform      @default(INSTAGRAM)
+  externalPostId   String
+  permalink        String
+  publishedAt      DateTime            @default(now())
+  scheduledPost    ScheduledPost?      @relation(fields: [scheduledPostId], references: [id])
+  generatedAsset   GeneratedAsset      @relation(fields: [generatedAssetId], references: [id])
+  analytics        AnalyticsSnapshot[]
+}
+
+model AnalyticsSnapshot {
+  id              String        @id @default(uuid())
+  publishedPostId String
+  likesCount      Int           @default(0)
+  commentsCount   Int           @default(0)
+  sharesCount     Int           @default(0)
+  savesCount      Int           @default(0)
+  reach           Int           @default(0)
+  impressions     Int           @default(0)
+  publishedPost   PublishedPost @relation(fields: [publishedPostId], references: [id], onDelete: Cascade)
+  capturedAt      DateTime      @default(now())
+}
+
+model N8nIntegration {
+  id                  String               @id @default(uuid())
+  workspaceId         String
+  name                String
+  description         String?
+  webhookUrlEncrypted String
+  isEnabled           Boolean              @default(true)
+  secretEncrypted     String
+  eventFiltersJson    Json?
+  lastDeliveryAt      DateTime?
+  lastDeliveryStatus  String?
+  failureCount        Int                  @default(0)
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  workspace           Workspace            @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  deliveries          N8nWebhookDelivery[]
+
+  @@index([workspaceId])
+  @@index([isEnabled])
+}
+
+model N8nWebhookDelivery {
+  id                   String         @id @default(uuid())
+  workspaceId          String
+  integrationId        String
+  eventId              String
+  eventType            String
+  payloadJson          Json
+  attemptCount         Int            @default(0)
+  status               String         @default("QUEUED")
+  responseStatus       Int?
+  responseBodyPreview  String?
+  lastAttemptAt        DateTime?
+  nextAttemptAt        DateTime?
+  deliveredAt          DateTime?
+  errorCode            String?
+  errorMessage         String?
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
+  workspace            Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  integration          N8nIntegration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+
+  @@unique([integrationId, eventId])
+  @@index([workspaceId])
+  @@index([integrationId])
+  @@index([eventType])
+  @@index([status])
+  @@index([nextAttemptAt])
+  @@index([createdAt])
+}
+

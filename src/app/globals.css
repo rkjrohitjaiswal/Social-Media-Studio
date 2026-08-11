@@ -1,0 +1,100 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --background: #0b0c0e;
+    --foreground: #f5f4f0;
+    --surface-1: #14161a;
+    --surface-2: #1c1f26;
+    --surface-3: #262930;
+    --border-subtle: rgba(255, 255, 255, 0.08);
+    --border-gold: rgba(197, 160, 89, 0.3);
+    
+    --accent-gold: #c5a059;
+    --accent-gold-hover: #d4af37;
+    --accent-gold-muted: rgba(197, 160, 89, 0.15);
+    
+    --text-muted: #9e9d98;
+    --text-dim: #6b6a65;
+    
+    --status-success: #4e8765;
+    --status-danger: #a84b4b;
+    --status-warning: #c59f59;
+    --status-info: #5a7b9c;
+  }
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans), system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  overflow-x: hidden;
+  letter-spacing: -0.01em;
+}
+
+.font-serif-luxury {
+  font-family: var(--font-serif), Georgia, Cambria, "Times New Roman", Times, serif;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #0b0c0e;
+}
+::-webkit-scrollbar-thumb {
+  background: #1c1f26;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #c5a059;
+}
+
+/* Luxury Glassmorphism & Micro-Interactions */
+.glass-panel {
+  background: rgba(20, 22, 26, 0.75);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--border-subtle);
+}
+
+.glass-card {
+  background: rgba(28, 31, 38, 0.6);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--border-subtle);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.glass-card:hover {
+  border-color: rgba(197, 160, 89, 0.4);
+  box-shadow: 0 12px 32px -8px rgba(0, 0, 0, 0.7), 0 0 20px 0 rgba(197, 160, 89, 0.08);
+  transform: translateY(-2px);
+}
+
+.gold-glow {
+  box-shadow: 0 0 25px -5px rgba(197, 160, 89, 0.25);
+}
+
+.gold-border-glow {
+  border-color: #c5a059;
+  box-shadow: 0 0 15px 0 rgba(197, 160, 89, 0.2);
+}
+
+.gold-gradient-text {
+  background: linear-gradient(135deg, #f5f4f0 0%, #c5a059 50%, #d4af37 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Pulsing processing beam */
+@keyframes pulse-beam {
+  0%, 100% { opacity: 0.3; transform: scale(1); }
+  50% { opacity: 0.9; transform: scale(1.02); }
+}
+
+.animate-pulse-beam {
+  animation: pulse-beam 2.5s infinite ease-in-out;
+}
