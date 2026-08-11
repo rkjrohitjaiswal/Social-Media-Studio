@@ -3,8 +3,8 @@ import { InstagramAdapter } from "./instagram-provider";
 import { LinkedInProvider } from "./linkedin-provider";
 import { ThreadsProvider } from "./threads-provider";
 import { PinterestProvider } from "./pinterest-provider";
+import { FacebookProvider } from "./facebook-provider";
 import {
-  FacebookProvider,
   TikTokProvider,
   YouTubeProvider,
   XProvider,

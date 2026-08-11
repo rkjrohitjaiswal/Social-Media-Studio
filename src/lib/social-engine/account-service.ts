@@ -133,6 +133,7 @@ export class SocialAccountService {
     accessToken: string;
     refreshToken?: string;
     tokenExpiresAt?: Date;
+    metadataJson?: Record<string, unknown> | null;
   }): Promise<SafeSocialAccount> {
     const {
       workspaceId,
@@ -145,6 +146,7 @@ export class SocialAccountService {
       accessToken,
       refreshToken,
       tokenExpiresAt,
+      metadataJson,
     } = params;
 
     // Check unique workspace + platform + externalAccountId
@@ -168,6 +170,7 @@ export class SocialAccountService {
       encryptedAccessToken: encryptSecret(accessToken),
       encryptedRefreshToken: refreshToken ? encryptSecret(refreshToken) : null,
       tokenExpiresAt: tokenExpiresAt || null,
+      metadataJson: metadataJson || null,
       connectedAt: new Date(),
       updatedAt: new Date(),
       createdAt: existingIndex >= 0 ? accountsStore[existingIndex].createdAt : new Date(),

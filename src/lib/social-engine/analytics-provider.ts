@@ -185,6 +185,70 @@ export class PinterestAnalyticsAdapter implements SocialPlatformAnalyticsProvide
   }
 }
 
+export class FacebookAnalyticsAdapter implements SocialPlatformAnalyticsProvider {
+  readonly platform = "FACEBOOK" as const;
+
+  async getMediaAnalytics(externalPostId: string, accessToken?: string): Promise<AnalyticsResponse> {
+    if (!accessToken || accessToken.startsWith("mock-")) {
+      return {
+        available: false,
+        message:
+          "Facebook Page insights require 'pages_read_engagement' permission approval from the Meta Developer Portal.",
+      };
+    }
+
+    try {
+      const version = process.env.FACEBOOK_API_VERSION || "v25.0";
+      const url = `https://graph.facebook.com/${version}/${externalPostId}/insights?metric=post_impressions_unique,post_clicks,post_reactions_by_type_total&access_token=${accessToken}`;
+
+      const res = await fetch(url, { cache: "no-store" });
+      if (!res.ok) {
+        return {
+          available: false,
+          message:
+            "Facebook Page insights require 'pages_read_engagement' permission approval from the Meta Developer Portal.",
+        };
+      }
+
+      const payload = (await res.json()) as { data?: Array<{ name: string; values: Array<{ value: number | Record<string, number> }> }> };
+      const getVal = (name: string): number => {
+        const item = payload.data?.find((d) => d.name === name);
+        const val = item?.values?.[0]?.value;
+        if (typeof val === "number") return val;
+        if (typeof val === "object" && val !== null) {
+          return Object.values(val).reduce((a, b) => a + (typeof b === "number" ? b : 0), 0);
+        }
+        return 0;
+      };
+
+      const reach = getVal("post_impressions_unique");
+      const clicks = getVal("post_clicks");
+      const reactions = getVal("post_reactions_by_type_total");
+      const engagements = clicks + reactions;
+
+      return {
+        available: true,
+        metrics: {
+          impressions: reach,
+          reach,
+          likes: reactions,
+          comments: 0,
+          shares: clicks,
+          saves: 0,
+          engagements,
+          engagementRate: reach > 0 ? (engagements / reach) * 100 : 0,
+        },
+      };
+    } catch {
+      return {
+        available: false,
+        message:
+          "Facebook Page insights require 'pages_read_engagement' permission approval from the Meta Developer Portal.",
+      };
+    }
+  }
+}
+
 export class GenericUnsupportedAnalyticsProvider implements SocialPlatformAnalyticsProvider {
   readonly platform: SocialPlatform;
 
@@ -208,6 +272,7 @@ export class UniversalAnalyticsProvider {
     this.providers.set("LINKEDIN", new LinkedInAnalyticsAdapter());
     this.providers.set("THREADS", new ThreadsAnalyticsAdapter());
     this.providers.set("PINTEREST", new PinterestAnalyticsAdapter());
+    this.providers.set("FACEBOOK", new FacebookAnalyticsAdapter());
   }
 
   getProvider(platform: SocialPlatform): SocialPlatformAnalyticsProvider {

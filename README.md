@@ -14,7 +14,7 @@ AI Social Media Studio is an enterprise-grade social content engine built with *
 | **LinkedIn** | **LIVE** | OAuth 2.0 (LinkedIn REST API) | Live Posts & Image Upload API | Permission Guarded |
 | **Threads** | **LIVE** | OAuth 2.0 (Meta Threads API) | Live 2-Step Container API | Live Insights API |
 | **Pinterest** | **LIVE** | OAuth 2.0 (Pinterest API v5) | Live Image Pin & Board API | Permission Guarded |
-| **Facebook** | **MOCK/STUB** | Stub Account Service | Mock Engine | Stub |
+| **Facebook** | **LIVE** | OAuth 2.0 (Meta Graph API v25.0) | Live Page Feed & Photo API | Live Page Insights API |
 | **TikTok** | **MOCK/STUB** | Stub Account Service | Mock Engine | Stub |
 | **YouTube** | **MOCK/STUB** | Stub Account Service | Mock Engine | Stub |
 | **X (Twitter)** | **MOCK/STUB** | Stub Account Service | Mock Engine | Stub |
@@ -46,44 +46,44 @@ AI Social Media Studio is an enterprise-grade social content engine built with *
     - 2-Step container publishing (`POST /v1.0/{user_id}/threads` & `POST /v1.0/{user_id}/threads_publish`) with status polling.
     - Live insights analytics adapter (`GET /v1.0/{post_id}/threads_insights`).
 11. **Pinterest Production Integration**:
-    - **Pinterest API v5 OAuth 2.0**: Endpoints at `/api/integrations/pinterest/connect`, `/api/integrations/pinterest/callback`, `/api/integrations/pinterest/disconnect` using Basic Auth header token exchange.
-    - **Board Management & Selection**: Board discovery endpoint at `/api/integrations/pinterest/boards` (`GET /v5/boards`). Automatic default board fallback and custom board assignment via `platformMetadataJson.boardId`.
-    - **Image Pin Publishing**: Direct Pin creation (`POST /v5/pins`) with destination URLs (`link`), searchable titles (max 100 chars), rich descriptions (max 800 chars), and alt text (`alt_text`).
-    - **Content Archetype Optimizations**:
-      - **Affiliate Product**: Mandatory disclosure (`#ad #affiliate`), preserved affiliate destination URLs, strict non-fabrication of unverified prices/claims.
-      - **Certification**: Clean visual achievement pins featuring credential URLs and issuing organizations.
-      - **Teaching / Masterclass**: Tutorial titles, key educational objectives, guide URLs, and non-spam keyword tags.
-      - **Project / Portfolio**: Project titles, tech stack keywords, and editorial portfolio links.
-12. **Content Calendar & Automated Scheduler**: Universal background publishing dispatching through provider registry with idempotency, grace periods, and retry queues.
+    - Pinterest API v5 OAuth 2.0 (`/api/integrations/pinterest/...`).
+    - Board management & discovery endpoint (`/api/integrations/pinterest/boards`).
+    - Direct Pin creation (`POST /v5/pins`) with destination URLs, searchable titles, rich descriptions, and alt text.
+12. **Facebook Production Integration**:
+    - **Meta Graph API v25.0 OAuth 2.0**: Endpoints at `/api/integrations/facebook/connect`, `/api/integrations/facebook/callback`, `/api/integrations/facebook/disconnect`.
+    - **Page Management & Discovery**: Page lookup endpoint at `/api/integrations/facebook/pages` (`GET /v25.0/me/accounts`). Stores Page Access Token linked to external Page ID.
+    - **Page Publishing**: Live text/link posts to `/v25.0/{page_id}/feed` and photo posts to `/v25.0/{page_id}/photos`.
+    - **Content Archetypes**: Supports Affiliate Product (with mandatory disclosure `#ad`), Certification, Teaching/Masterclass, Project/Portfolio, Personal Brand, Announcement, and General Posts.
+13. **Content Calendar & Automated Scheduler**: Universal background publishing dispatching through provider registry with idempotency, grace periods, and retry queues.
 
 ---
 
-## 📌 Pinterest Integration Setup & Developer Guide
+## 📘 Facebook Integration Setup & Developer Guide
 
-### 1. Pinterest Developer Console Configuration
-1. Log into the [Pinterest Developer Console](https://developers.pinterest.com/).
-2. Create an App under your Business account.
-3. Under **OAuth Settings**, configure Redirect URIs:
-   - `http://localhost:3000/api/integrations/pinterest/callback` (Local Development)
-   - `https://yourdomain.com/api/integrations/pinterest/callback` (Production)
-4. Enable App Scopes:
-   - `user_accounts:read`: Read user profile
-   - `boards:read`: Retrieve account boards
-   - `boards:write`: Create or manage boards
-   - `pins:read`: Access Pin metrics and details
-   - `pins:write`: Create image Pins
+### 1. Meta Developer Portal Setup
+1. Log into [Meta for Developers](https://developers.facebook.com/).
+2. Create an App of type **Business**.
+3. Under **Facebook Login for Business**, configure OAuth Redirect URIs:
+   - `http://localhost:3000/api/integrations/facebook/callback` (Local Development)
+   - `https://yourdomain.com/api/integrations/facebook/callback` (Production)
+4. Enable Permissions:
+   - `pages_show_list`: Retrieve Facebook Pages managed by user (Standard Access for admins; Advanced Access required for general public users).
+   - `pages_read_engagement`: Access Page engagement insights (Requires Meta App Review / Advanced Access).
+   - `pages_manage_posts`: Publish text, photo, and link posts to Facebook Pages (Requires Meta App Review / Advanced Access).
 
 ### 2. Environment Variables
 Add the following to `.env`:
 ```env
-PINTEREST_APP_ID="your-pinterest-app-id"
-PINTEREST_APP_SECRET="your-pinterest-app-secret"
-PINTEREST_REDIRECT_URI="http://localhost:3000/api/integrations/pinterest/callback"
+FACEBOOK_APP_ID="your-facebook-app-id"
+FACEBOOK_APP_SECRET="your-facebook-app-secret"
+FACEBOOK_REDIRECT_URI="http://localhost:3000/api/integrations/facebook/callback"
+FACEBOOK_API_VERSION="v25.0"
 ```
 
-### 3. Analytics Limitations & Permissions
-- Pinterest Analytics (`PinterestAnalyticsAdapter`) queries `GET /v5/pins/{pin_id}/analytics`.
-- Requires `pins:read` scope approval. If permission is missing, the adapter returns a truthful `available: false` message without fabricating metrics.
+### 3. Analytics & Scope Limitations
+- Facebook Page Analytics (`FacebookAnalyticsAdapter`) queries `GET /v25.0/{post_id}/insights`.
+- Requires `pages_read_engagement` scope. If permission is missing, the adapter returns a truthful `available: false` message without fabricating values.
+- **Reels & Video Uploads**: Reels and video chunking uploads are not implemented in this milestone.
 
 ---
 
@@ -94,7 +94,7 @@ PINTEREST_REDIRECT_URI="http://localhost:3000/api/integrations/pinterest/callbac
 - **Database & ORM**: PostgreSQL & Prisma ORM v7
 - **Background Queues & Workers**: Redis & BullMQ
 - **Auth & Storage**: Supabase SSR Auth & Supabase Storage
-- **Testing**: Vitest (168 unit, integration, and E2E tests)
+- **Testing**: Vitest (181 unit, integration, and E2E tests)
 
 ---
 
