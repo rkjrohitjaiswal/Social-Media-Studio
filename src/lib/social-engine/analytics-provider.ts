@@ -249,6 +249,130 @@ export class FacebookAnalyticsAdapter implements SocialPlatformAnalyticsProvider
   }
 }
 
+export class TikTokAnalyticsAdapter implements SocialPlatformAnalyticsProvider {
+  readonly platform = "TIKTOK" as const;
+
+  async getMediaAnalytics(externalPostId: string, accessToken?: string): Promise<AnalyticsResponse> {
+    if (!accessToken || accessToken.startsWith("mock-")) {
+      return {
+        available: false,
+        message:
+          "TikTok Video Analytics requires 'video.list' scope approval from the TikTok Developer Portal.",
+      };
+    }
+
+    try {
+      const url = `https://open.tiktokapis.com/v2/video/query/?fields=id,like_count,comment_count,share_count,view_count`;
+      const res = await fetch(url, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ filters: { video_ids: [externalPostId] } }),
+        cache: "no-store",
+      });
+
+      if (!res.ok) {
+        return {
+          available: false,
+          message:
+            "TikTok Video Analytics requires 'video.list' scope approval from the TikTok Developer Portal.",
+        };
+      }
+
+      const payload = (await res.json()) as {
+        data?: { videos?: Array<{ view_count?: number; like_count?: number; comment_count?: number; share_count?: number }> };
+      };
+      const v = payload.data?.videos?.[0] || {};
+      const views = v.view_count || 0;
+      const likes = v.like_count || 0;
+      const comments = v.comment_count || 0;
+      const shares = v.share_count || 0;
+      const engagements = likes + comments + shares;
+
+      return {
+        available: true,
+        metrics: {
+          impressions: views,
+          reach: views,
+          likes,
+          comments,
+          shares,
+          saves: 0,
+          engagements,
+          engagementRate: views > 0 ? (engagements / views) * 100 : 0,
+        },
+      };
+    } catch {
+      return {
+        available: false,
+        message:
+          "TikTok Video Analytics requires 'video.list' scope approval from the TikTok Developer Portal.",
+      };
+    }
+  }
+}
+
+export class YouTubeAnalyticsAdapter implements SocialPlatformAnalyticsProvider {
+  readonly platform = "YOUTUBE" as const;
+
+  async getMediaAnalytics(externalPostId: string, accessToken?: string): Promise<AnalyticsResponse> {
+    if (!accessToken || accessToken.startsWith("mock-")) {
+      return {
+        available: false,
+        message:
+          "YouTube Video Analytics requires 'youtube.readonly' scope and Google API credentials.",
+      };
+    }
+
+    try {
+      const url = `https://www.googleapis.com/youtube/v3/videos?part=statistics&id=${externalPostId}`;
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+        cache: "no-store",
+      });
+
+      if (!res.ok) {
+        return {
+          available: false,
+          message:
+            "YouTube Video Analytics requires 'youtube.readonly' scope and Google API credentials.",
+        };
+      }
+
+      const payload = (await res.json()) as {
+        items?: Array<{ statistics?: { viewCount?: string; likeCount?: string; commentCount?: string } }>;
+      };
+      const stats = payload.items?.[0]?.statistics || {};
+      const views = parseInt(stats.viewCount || "0", 10);
+      const likes = parseInt(stats.likeCount || "0", 10);
+      const comments = parseInt(stats.commentCount || "0", 10);
+      const engagements = likes + comments;
+
+      return {
+        available: true,
+        metrics: {
+          impressions: views,
+          reach: views,
+          likes,
+          comments,
+          shares: 0,
+          saves: 0,
+          engagements,
+          engagementRate: views > 0 ? (engagements / views) * 100 : 0,
+        },
+      };
+    } catch {
+      return {
+        available: false,
+        message:
+          "YouTube Video Analytics requires 'youtube.readonly' scope and Google API credentials.",
+      };
+    }
+  }
+}
+
 export class GenericUnsupportedAnalyticsProvider implements SocialPlatformAnalyticsProvider {
   readonly platform: SocialPlatform;
 
@@ -273,6 +397,8 @@ export class UniversalAnalyticsProvider {
     this.providers.set("THREADS", new ThreadsAnalyticsAdapter());
     this.providers.set("PINTEREST", new PinterestAnalyticsAdapter());
     this.providers.set("FACEBOOK", new FacebookAnalyticsAdapter());
+    this.providers.set("TIKTOK", new TikTokAnalyticsAdapter());
+    this.providers.set("YOUTUBE", new YouTubeAnalyticsAdapter());
   }
 
   getProvider(platform: SocialPlatform): SocialPlatformAnalyticsProvider {

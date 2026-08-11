@@ -50,18 +50,6 @@ export class LinkedInProvider extends GenericMockPlatformProvider {
   }
 }
 
-export class TikTokProvider extends GenericMockPlatformProvider {
-  constructor() {
-    super("TIKTOK");
-  }
-}
-
-export class YouTubeProvider extends GenericMockPlatformProvider {
-  constructor() {
-    super("YOUTUBE");
-  }
-}
-
 export class XProvider extends GenericMockPlatformProvider {
   constructor() {
     super("X");

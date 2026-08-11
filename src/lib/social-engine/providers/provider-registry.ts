@@ -4,9 +4,9 @@ import { LinkedInProvider } from "./linkedin-provider";
 import { ThreadsProvider } from "./threads-provider";
 import { PinterestProvider } from "./pinterest-provider";
 import { FacebookProvider } from "./facebook-provider";
+import { TikTokProvider } from "./tiktok-provider";
+import { YouTubeProvider } from "./youtube-provider";
 import {
-  TikTokProvider,
-  YouTubeProvider,
   XProvider,
   RedditProvider,
   TelegramProvider,

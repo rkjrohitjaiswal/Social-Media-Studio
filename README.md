@@ -15,8 +15,8 @@ AI Social Media Studio is an enterprise-grade social content engine built with *
 | **Threads** | **LIVE** | OAuth 2.0 (Meta Threads API) | Live 2-Step Container API | Live Insights API |
 | **Pinterest** | **LIVE** | OAuth 2.0 (Pinterest API v5) | Live Image Pin & Board API | Permission Guarded |
 | **Facebook** | **LIVE** | OAuth 2.0 (Meta Graph API v25.0) | Live Page Feed & Photo API | Live Page Insights API |
-| **TikTok** | **MOCK/STUB** | Stub Account Service | Mock Engine | Stub |
-| **YouTube** | **MOCK/STUB** | Stub Account Service | Mock Engine | Stub |
+| **TikTok** | **IMPLEMENTED (REQUIRES TIKTOK CLIENT AUDIT FOR PUBLIC VISIBILITY)** | OAuth 2.0 (TikTok API v2) | Live Direct Post API v2 (`video.publish`) | Permission Guarded (`video.list`) |
+| **YouTube** | **LIVE** | OAuth 2.0 (Google OAuth 2.0) | Live YouTube Data API v3 Upload | Live YouTube Data API v3 |
 | **X (Twitter)** | **MOCK/STUB** | Stub Account Service | Mock Engine | Stub |
 | **Reddit** | **MOCK/STUB** | Stub Account Service | Mock Engine | Stub |
 | **Telegram** | **MOCK/STUB** | Stub Account Service | Mock Engine | Stub |
@@ -50,40 +50,49 @@ AI Social Media Studio is an enterprise-grade social content engine built with *
     - Board management & discovery endpoint (`/api/integrations/pinterest/boards`).
     - Direct Pin creation (`POST /v5/pins`) with destination URLs, searchable titles, rich descriptions, and alt text.
 12. **Facebook Production Integration**:
-    - **Meta Graph API v25.0 OAuth 2.0**: Endpoints at `/api/integrations/facebook/connect`, `/api/integrations/facebook/callback`, `/api/integrations/facebook/disconnect`.
-    - **Page Management & Discovery**: Page lookup endpoint at `/api/integrations/facebook/pages` (`GET /v25.0/me/accounts`). Stores Page Access Token linked to external Page ID.
-    - **Page Publishing**: Live text/link posts to `/v25.0/{page_id}/feed` and photo posts to `/v25.0/{page_id}/photos`.
-    - **Content Archetypes**: Supports Affiliate Product (with mandatory disclosure `#ad`), Certification, Teaching/Masterclass, Project/Portfolio, Personal Brand, Announcement, and General Posts.
-13. **Content Calendar & Automated Scheduler**: Universal background publishing dispatching through provider registry with idempotency, grace periods, and retry queues.
+    - Meta Graph API v25.0 OAuth 2.0 (`/api/integrations/facebook/...`).
+    - Page management & discovery (`GET /v25.0/me/accounts`). Stores Page Access Token linked to external Page ID.
+    - Live text/link posts to `/v25.0/{page_id}/feed` and photo posts to `/v25.0/{page_id}/photos`.
+13. **TikTok Production Integration**:
+    - **TikTok Content Posting API v2 OAuth 2.0**: Endpoints at `/api/integrations/tiktok/connect`, `/api/integrations/tiktok/callback`, `/api/integrations/tiktok/disconnect`, `/api/integrations/tiktok/account`.
+    - **Creator Info Query**: Pre-post query to `POST /v2/post/publish/creator_info/query/` to dynamically fetch allowed privacy options (`privacy_level_options`), comment/duet toggles, and duration limits.
+    - **Direct Post Publishing Flow**: Automated 2-step Direct Post (`video.publish` scope) initialized via `POST /v2/post/publish/video/init/` with status polling (`POST /v2/post/publish/status/fetch/`).
+    - **AI-Generated Disclosure (`is_aigc`)**: Automatic setting of `is_aigc: true` for AI studio pipeline video content.
+    - **Commercial / Affiliate Disclosure**: Setting of `brand_content_toggle: true` for Affiliate Product posts or captions with mandatory `#ad` / `#affiliate` tags as required by TikTok terms.
+14. **YouTube Production Integration**:
+    - **Google OAuth 2.0 Authorization**: Endpoints at `/api/integrations/youtube/connect`, `/api/integrations/youtube/callback`, `/api/integrations/youtube/disconnect`, `/api/integrations/youtube/channels`.
+    - **Multi-Channel Management**: Connect and manage multiple YouTube channels isolated by `workspaceId + platform + externalAccountId`.
+    - **YouTube Data API v3 Resumable Upload**: Direct video upload via `POST /upload/youtube/v3/videos?uploadType=resumable` supporting Title (100 char limit), Description (5000 char limit), Tags, Category ID (`28`), and Privacy Status (`public`, `private`, `unlisted`).
+    - **Custom Thumbnail Upload**: Support for custom video thumbnail setting via `POST /upload/youtube/v3/thumbnails/set`.
+    - **Affiliate Disclosure Safeguard**: Mandatory affiliate disclosure injection (`"Disclosure: This video contains affiliate links..."`) for commercial product posts.
+    - **Live Video Analytics**: `YouTubeAnalyticsAdapter` retrieving view counts, likes, and comments via `GET /v3/videos?part=statistics`.
+15. **Content Calendar & Automated Scheduler**: Universal background publishing dispatching through provider registry with idempotency, grace periods, and retry queues.
 
 ---
 
-## 📘 Facebook Integration Setup & Developer Guide
+## 📺 YouTube Integration Setup & Developer Guide
 
-### 1. Meta Developer Portal Setup
-1. Log into [Meta for Developers](https://developers.facebook.com/).
-2. Create an App of type **Business**.
-3. Under **Facebook Login for Business**, configure OAuth Redirect URIs:
-   - `http://localhost:3000/api/integrations/facebook/callback` (Local Development)
-   - `https://yourdomain.com/api/integrations/facebook/callback` (Production)
-4. Enable Permissions:
-   - `pages_show_list`: Retrieve Facebook Pages managed by user (Standard Access for admins; Advanced Access required for general public users).
-   - `pages_read_engagement`: Access Page engagement insights (Requires Meta App Review / Advanced Access).
-   - `pages_manage_posts`: Publish text, photo, and link posts to Facebook Pages (Requires Meta App Review / Advanced Access).
+### 1. Google Cloud Console Configuration
+1. Log into the [Google Cloud Console](https://console.cloud.google.com/).
+2. Create or select a Project and enable the **YouTube Data API v3**.
+3. Under **OAuth consent screen**, configure:
+   - User type: External
+   - Scopes:
+     - `https://www.googleapis.com/auth/youtube.upload`: Upload YouTube videos
+     - `https://www.googleapis.com/auth/youtube.readonly`: Read YouTube channel & video details
+     - `https://www.googleapis.com/auth/yt-analytics.readonly`: Read YouTube analytics reports
+4. Create **OAuth 2.0 Client IDs** (Web application):
+   - Authorized redirect URIs:
+     - `http://localhost:3000/api/integrations/youtube/callback` (Development)
+     - `https://yourdomain.com/api/integrations/youtube/callback` (Production)
 
 ### 2. Environment Variables
 Add the following to `.env`:
 ```env
-FACEBOOK_APP_ID="your-facebook-app-id"
-FACEBOOK_APP_SECRET="your-facebook-app-secret"
-FACEBOOK_REDIRECT_URI="http://localhost:3000/api/integrations/facebook/callback"
-FACEBOOK_API_VERSION="v25.0"
+YOUTUBE_CLIENT_ID="your-youtube-client-id"
+YOUTUBE_CLIENT_SECRET="your-youtube-client-secret"
+YOUTUBE_REDIRECT_URI="http://localhost:3000/api/integrations/youtube/callback"
 ```
-
-### 3. Analytics & Scope Limitations
-- Facebook Page Analytics (`FacebookAnalyticsAdapter`) queries `GET /v25.0/{post_id}/insights`.
-- Requires `pages_read_engagement` scope. If permission is missing, the adapter returns a truthful `available: false` message without fabricating values.
-- **Reels & Video Uploads**: Reels and video chunking uploads are not implemented in this milestone.
 
 ---
 
@@ -94,7 +103,7 @@ FACEBOOK_API_VERSION="v25.0"
 - **Database & ORM**: PostgreSQL & Prisma ORM v7
 - **Background Queues & Workers**: Redis & BullMQ
 - **Auth & Storage**: Supabase SSR Auth & Supabase Storage
-- **Testing**: Vitest (181 unit, integration, and E2E tests)
+- **Testing**: Vitest (207 unit, integration, and E2E tests)
 
 ---
 
