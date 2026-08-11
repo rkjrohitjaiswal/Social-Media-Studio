@@ -90,8 +90,8 @@ This repository includes the complete implementation of **Milestones 1 through 1
 ### 2. Installation
 ```bash
 # Clone the repository
-git clone https://github.com/your-org/ai-social-media-studio.git
-cd ai-social-media-studio
+git clone https://github.com/rkjrohitjaiswal/Social-Media-Studio.git
+cd Social-Media-Studio
 
 # Install dependencies
 npm install
