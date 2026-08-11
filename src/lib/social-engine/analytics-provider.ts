@@ -68,6 +68,62 @@ export class LinkedInAnalyticsAdapter implements SocialPlatformAnalyticsProvider
   }
 }
 
+export class ThreadsAnalyticsAdapter implements SocialPlatformAnalyticsProvider {
+  readonly platform = "THREADS" as const;
+
+  async getMediaAnalytics(externalPostId: string, accessToken?: string): Promise<AnalyticsResponse> {
+    if (!accessToken || accessToken.startsWith("mock-")) {
+      return {
+        available: false,
+        message:
+          "Threads analytics requires 'threads_manage_insights' permission approval from Meta Developer Portal.",
+      };
+    }
+
+    try {
+      const version = process.env.THREADS_API_VERSION || "v1.0";
+      const url = `https://graph.threads.net/${version}/${externalPostId}/threads_insights?metric=views,likes,replies,reposts,quotes&access_token=${accessToken}`;
+      const res = await fetch(url, { cache: "no-store" });
+      if (!res.ok) {
+        return {
+          available: false,
+          message:
+            "Threads analytics requires 'threads_manage_insights' permission approval from Meta Developer Portal.",
+        };
+      }
+
+      const payload = (await res.json()) as { data?: Array<{ name: string; values: Array<{ value: number }> }> };
+      const getVal = (name: string) => payload.data?.find((d) => d.name === name)?.values?.[0]?.value || 0;
+
+      const views = getVal("views");
+      const likes = getVal("likes");
+      const comments = getVal("replies");
+      const shares = getVal("reposts") + getVal("quotes");
+      const totalEngagements = likes + comments + shares;
+
+      return {
+        available: true,
+        metrics: {
+          impressions: views,
+          reach: views,
+          likes,
+          comments,
+          shares,
+          saves: 0,
+          engagements: totalEngagements,
+          engagementRate: views > 0 ? (totalEngagements / views) * 100 : 0,
+        },
+      };
+    } catch {
+      return {
+        available: false,
+        message:
+          "Threads analytics requires 'threads_manage_insights' permission approval from Meta Developer Portal.",
+      };
+    }
+  }
+}
+
 export class GenericUnsupportedAnalyticsProvider implements SocialPlatformAnalyticsProvider {
   readonly platform: SocialPlatform;
 
@@ -89,6 +145,7 @@ export class UniversalAnalyticsProvider {
   constructor() {
     this.providers.set("INSTAGRAM", new InstagramAnalyticsAdapter());
     this.providers.set("LINKEDIN", new LinkedInAnalyticsAdapter());
+    this.providers.set("THREADS", new ThreadsAnalyticsAdapter());
   }
 
   getProvider(platform: SocialPlatform): SocialPlatformAnalyticsProvider {
