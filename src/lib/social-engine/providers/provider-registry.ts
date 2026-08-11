@@ -1,7 +1,7 @@
 import { SocialPlatform, SocialPlatformProvider } from "../types";
 import { InstagramAdapter } from "./instagram-provider";
+import { LinkedInProvider } from "./linkedin-provider";
 import {
-  LinkedInProvider,
   ThreadsProvider,
   PinterestProvider,
   FacebookProvider,
