@@ -6,8 +6,8 @@ import { PinterestProvider } from "./pinterest-provider";
 import { FacebookProvider } from "./facebook-provider";
 import { TikTokProvider } from "./tiktok-provider";
 import { YouTubeProvider } from "./youtube-provider";
+import { XProvider } from "./x-provider";
 import {
-  XProvider,
   RedditProvider,
   TelegramProvider,
   BlueskyProvider,

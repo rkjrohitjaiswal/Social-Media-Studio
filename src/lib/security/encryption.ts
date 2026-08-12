@@ -42,12 +42,26 @@ export function decryptToken(encryptedString: string): string {
 export const encryptSecret = encryptToken;
 export const decryptSecret = decryptToken;
 
-export function generateSignedOAuthState(workspaceId: string, userId: string): string {
+export function generatePKCEChallenge(): { codeVerifier: string; codeChallenge: string } {
+  const codeVerifier = crypto.randomBytes(32).toString("base64url");
+  const codeChallenge = crypto
+    .createHash("sha256")
+    .update(codeVerifier)
+    .digest("base64url");
+  return { codeVerifier, codeChallenge };
+}
+
+export function generateSignedOAuthState(
+  workspaceId: string,
+  userId: string,
+  extraPayload?: Record<string, unknown>
+): string {
   const payload = {
     workspaceId,
     userId,
     timestamp: Date.now(),
     nonce: crypto.randomBytes(8).toString("hex"),
+    ...extraPayload,
   };
   const jsonStr = JSON.stringify(payload);
   const key = getEncryptionKey();
@@ -55,7 +69,12 @@ export function generateSignedOAuthState(workspaceId: string, userId: string): s
   return Buffer.from(`${jsonStr}::${hmac}`).toString("base64url");
 }
 
-export function verifyOAuthState(stateStr: string): { workspaceId: string; userId: string } {
+export function verifyOAuthState(stateStr: string): {
+  workspaceId: string;
+  userId: string;
+  codeVerifier?: string;
+  [key: string]: unknown;
+} {
   const decoded = Buffer.from(stateStr, "base64url").toString("utf8");
   const [jsonStr, hmac] = decoded.split("::");
   if (!jsonStr || !hmac) {
@@ -74,5 +93,5 @@ export function verifyOAuthState(stateStr: string): { workspaceId: string; userI
     throw new Error("OAuth state expired (older than 10 minutes)");
   }
 
-  return { workspaceId: payload.workspaceId, userId: payload.userId };
+  return payload;
 }

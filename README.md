@@ -17,7 +17,7 @@ AI Social Media Studio is an enterprise-grade social content engine built with *
 | **Facebook** | **LIVE** | OAuth 2.0 (Meta Graph API v25.0) | Live Page Feed & Photo API | Live Page Insights API |
 | **TikTok** | **IMPLEMENTED (REQUIRES TIKTOK CLIENT AUDIT FOR PUBLIC VISIBILITY)** | OAuth 2.0 (TikTok API v2) | Live Direct Post API v2 (`video.publish`) | Permission Guarded (`video.list`) |
 | **YouTube** | **LIVE** | OAuth 2.0 (Google OAuth 2.0) | Live YouTube Data API v3 Upload | Live YouTube Data API v3 |
-| **X (Twitter)** | **MOCK/STUB** | Stub Account Service | Mock Engine | Stub |
+| **X (Twitter)** | **LIVE** | OAuth 2.0 PKCE (X API v2) | Live Tweet & Media API v2 | Live Tweet Public Metrics API v2 |
 | **Reddit** | **MOCK/STUB** | Stub Account Service | Mock Engine | Stub |
 | **Telegram** | **MOCK/STUB** | Stub Account Service | Mock Engine | Stub |
 | **Bluesky** | **MOCK/STUB** | Stub Account Service | Mock Engine | Stub |
@@ -66,9 +66,34 @@ AI Social Media Studio is an enterprise-grade social content engine built with *
     - **Custom Thumbnail Upload**: Support for custom video thumbnail setting via `POST /upload/youtube/v3/thumbnails/set`.
     - **Affiliate Disclosure Safeguard**: Mandatory affiliate disclosure injection (`"Disclosure: This video contains affiliate links..."`) for commercial product posts.
     - **Live Video Analytics**: `YouTubeAnalyticsAdapter` retrieving view counts, likes, and comments via `GET /v3/videos?part=statistics`.
-15. **Content Calendar & Automated Scheduler**: Universal background publishing dispatching through provider registry with idempotency, grace periods, and retry queues.
+15. **X (Twitter) Production Integration**:
+    - **OAuth 2.0 Authorization Code with PKCE**: Endpoints at `/api/integrations/x/connect` and `/api/integrations/x/callback` using S256 PKCE challenge & verifier.
+    - **Signed OAuth State / CSRF Protection**: HMAC SHA-256 state signatures with 10-minute validity.
+    - **Multi-Account & Workspace Isolation**: Connect and manage multiple X handles isolated by `workspaceId + platform + externalAccountId`.
+    - **Live Tweet & Media Publishing**: Posting via X API v2 `POST /2/tweets` and Twitter v1.1 Media Upload `POST upload.x.com/1.1/media/upload.json`.
+    - **Validation & Protections**: 280-character limit enforcement and HTTPS media validation / SSRF protection.
+    - **Affiliate Disclosure Safeguard**: Automated `#ad` `#affiliate` hashtag insertion for commercial product content.
+    - **Live Tweet Analytics**: `XAnalyticsAdapter` fetching public metrics (retweets, replies, likes, quotes, bookmarks, impressions) via `GET /2/tweets/:id?tweet.fields=public_metrics`.
+16. **Content Calendar & Automated Scheduler**: Universal background publishing dispatching through provider registry with idempotency, grace periods, and retry queues.
 
 ---
+
+## 🐦 X (Twitter) Developer Portal Setup Guide
+
+1. Log into the [X Developer Portal](https://developer.x.com/).
+2. Create a Project and App with **User authentication settings**:
+   - App permissions: **Read and write and Direct Messages** (or Read and write)
+   - Type of App: **Web App, Automated App or Bot** (Confidential Client)
+   - OAuth 2.0 Settings:
+     - Callback URL: `http://localhost:3000/api/integrations/x/callback`
+     - Website URL: `http://localhost:3000`
+3. Copy the **Client ID** and **Client Secret**.
+4. Configure in `.env`:
+   ```env
+   X_CLIENT_ID="your-x-client-id"
+   X_CLIENT_SECRET="your-x-client-secret"
+   X_REDIRECT_URI="http://localhost:3000/api/integrations/x/callback"
+   ```
 
 ## 📺 YouTube Integration Setup & Developer Guide
 

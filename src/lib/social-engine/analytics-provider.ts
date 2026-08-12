@@ -373,6 +373,87 @@ export class YouTubeAnalyticsAdapter implements SocialPlatformAnalyticsProvider 
   }
 }
 
+export class XAnalyticsAdapter implements SocialPlatformAnalyticsProvider {
+  readonly platform = "X" as const;
+
+  async getMediaAnalytics(externalPostId: string, accessToken?: string): Promise<AnalyticsResponse> {
+    if (!accessToken || accessToken.startsWith("mock-")) {
+      return {
+        available: false,
+        message:
+          "X (Twitter) analytics requires 'tweet.read' scope and X API v2 credentials.",
+      };
+    }
+
+    try {
+      const url = `https://api.x.com/2/tweets/${externalPostId}?tweet.fields=public_metrics,non_public_metrics,organic_metrics`;
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+        cache: "no-store",
+      });
+
+      if (!res.ok) {
+        return {
+          available: false,
+          message:
+            "X (Twitter) analytics requires 'tweet.read' scope and X API v2 credentials.",
+        };
+      }
+
+      const payload = (await res.json()) as {
+        data?: {
+          public_metrics?: {
+            retweet_count?: number;
+            reply_count?: number;
+            like_count?: number;
+            quote_count?: number;
+            bookmark_count?: number;
+            impression_count?: number;
+          };
+          organic_metrics?: {
+            impression_count?: number;
+            like_count?: number;
+            reply_count?: number;
+            retweet_count?: number;
+          };
+        };
+      };
+
+      const pm = payload.data?.public_metrics || {};
+      const om = payload.data?.organic_metrics || {};
+
+      const impressions = pm.impression_count || om.impression_count || 0;
+      const likes = pm.like_count || om.like_count || 0;
+      const comments = pm.reply_count || om.reply_count || 0;
+      const retweets = pm.retweet_count || om.retweet_count || 0;
+      const quotes = pm.quote_count || 0;
+      const shares = retweets + quotes;
+      const saves = pm.bookmark_count || 0;
+      const totalEngagements = likes + comments + shares + saves;
+
+      return {
+        available: true,
+        metrics: {
+          impressions,
+          reach: impressions,
+          likes,
+          comments,
+          shares,
+          saves,
+          engagements: totalEngagements,
+          engagementRate: impressions > 0 ? (totalEngagements / impressions) * 100 : 0,
+        },
+      };
+    } catch {
+      return {
+        available: false,
+        message:
+          "X (Twitter) analytics requires 'tweet.read' scope and X API v2 credentials.",
+      };
+    }
+  }
+}
+
 export class GenericUnsupportedAnalyticsProvider implements SocialPlatformAnalyticsProvider {
   readonly platform: SocialPlatform;
 
@@ -399,6 +480,7 @@ export class UniversalAnalyticsProvider {
     this.providers.set("FACEBOOK", new FacebookAnalyticsAdapter());
     this.providers.set("TIKTOK", new TikTokAnalyticsAdapter());
     this.providers.set("YOUTUBE", new YouTubeAnalyticsAdapter());
+    this.providers.set("X", new XAnalyticsAdapter());
   }
 
   getProvider(platform: SocialPlatform): SocialPlatformAnalyticsProvider {
