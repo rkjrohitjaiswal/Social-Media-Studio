@@ -207,7 +207,7 @@ export default function SocialAccountsPage() {
               Select a target platform to initiate secure OAuth 2.0 authorization.
             </p>
             <div className="space-y-2">
-              {["INSTAGRAM", "LINKEDIN", "PINTEREST", "YOUTUBE", "THREADS", "TIKTOK", "X"].map((plat) => (
+              {["INSTAGRAM", "LINKEDIN", "PINTEREST", "FACEBOOK", "YOUTUBE", "THREADS", "TIKTOK", "X"].map((plat) => (
                 <button
                   key={plat}
                   type="button"
