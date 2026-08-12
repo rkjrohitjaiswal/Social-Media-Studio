@@ -17,7 +17,7 @@ AI Social Media Studio is an enterprise-grade social content engine built with *
 | **Facebook** | **LIVE** | OAuth 2.0 (Meta Graph API v25.0) | Live Page Feed & Photo API | Live Page Insights API |
 | **TikTok** | **IMPLEMENTED (REQUIRES TIKTOK CLIENT AUDIT FOR PUBLIC VISIBILITY)** | OAuth 2.0 (TikTok API v2) | Live Direct Post API v2 (`video.publish`) | Permission Guarded (`video.list`) |
 | **YouTube** | **LIVE** | OAuth 2.0 (Google OAuth 2.0) | Live YouTube Data API v3 Upload | Live YouTube Data API v3 |
-| **X (Twitter)** | **MOCK/STUB** | Stub Account Service | Mock Engine | Stub |
+| **X** | **IMPLEMENTED** | OAuth 2.0 PKCE | Live X API v2 Posts + Image Upload | Permission / Plan Guarded |
 | **Reddit** | **MOCK/STUB** | Stub Account Service | Mock Engine | Stub |
 | **Telegram** | **MOCK/STUB** | Stub Account Service | Mock Engine | Stub |
 | **Bluesky** | **MOCK/STUB** | Stub Account Service | Mock Engine | Stub |
@@ -33,66 +33,53 @@ AI Social Media Studio is an enterprise-grade social content engine built with *
 2. **1:N Batch Asset Generation**: Multi-image product input processing with style-vector reference anchors.
 3. **OpenAI Multi-Modal Integration**: Automated image generation & multi-aspect ratio processing with background execution.
 4. **AI Social Copywriting Engine**: Multi-platform post copy, hashtag generation, CTAs, and alt text using structured OpenAI outputs.
-5. **AI Quality Assessment Engine**: Multi-dimensional vision evaluation (lighting, style consistency, composition, product fidelity) with scoring and feedback.
+5. **AI Quality Assessment Engine**: Multi-dimensional vision evaluation with scoring and feedback.
 6. **Multi-Version Regeneration**: Version-tracked asset iterations with custom prompt adjustments and prompt history.
-7. **Human Governance & Approval Inbox**: Multi-stage approval workflow (`PENDING`, `APPROVED`, `CHANGES_REQUESTED`, `REJECTED`) with approval isolation.
+7. **Human Governance & Approval Inbox**: Multi-stage approval workflow with approval isolation.
 8. **Instagram Production Integration**: Meta Graph API OAuth connection with AES-256-GCM encrypted token storage.
-9. **LinkedIn Production Integration**:
-   - OAuth 2.0 Authorization Code flow (`/api/integrations/linkedin/...`).
-   - OpenID identity resolution (`https://api.linkedin.com/v2/userinfo`).
-   - Live REST API v202604 post & image publishing with URN formatting and token refresh.
-10. **Threads Production Integration**:
-    - Meta Threads OAuth flow (`/api/integrations/threads/...`).
-    - 2-Step container publishing (`POST /v1.0/{user_id}/threads` & `POST /v1.0/{user_id}/threads_publish`) with status polling.
-    - Live insights analytics adapter (`GET /v1.0/{post_id}/threads_insights`).
-11. **Pinterest Production Integration**:
-    - Pinterest API v5 OAuth 2.0 (`/api/integrations/pinterest/...`).
-    - Board management & discovery endpoint (`/api/integrations/pinterest/boards`).
-    - Direct Pin creation (`POST /v5/pins`) with destination URLs, searchable titles, rich descriptions, and alt text.
-12. **Facebook Production Integration**:
-    - Meta Graph API v25.0 OAuth 2.0 (`/api/integrations/facebook/...`).
-    - Page management & discovery (`GET /v25.0/me/accounts`). Stores Page Access Token linked to external Page ID.
-    - Live text/link posts to `/v25.0/{page_id}/feed` and photo posts to `/v25.0/{page_id}/photos`.
-13. **TikTok Production Integration**:
-    - **TikTok Content Posting API v2 OAuth 2.0**: Endpoints at `/api/integrations/tiktok/connect`, `/api/integrations/tiktok/callback`, `/api/integrations/tiktok/disconnect`, `/api/integrations/tiktok/account`.
-    - **Creator Info Query**: Pre-post query to `POST /v2/post/publish/creator_info/query/` to dynamically fetch allowed privacy options (`privacy_level_options`), comment/duet toggles, and duration limits.
-    - **Direct Post Publishing Flow**: Automated 2-step Direct Post (`video.publish` scope) initialized via `POST /v2/post/publish/video/init/` with status polling (`POST /v2/post/publish/status/fetch/`).
-    - **AI-Generated Disclosure (`is_aigc`)**: Automatic setting of `is_aigc: true` for AI studio pipeline video content.
-    - **Commercial / Affiliate Disclosure**: Setting of `brand_content_toggle: true` for Affiliate Product posts or captions with mandatory `#ad` / `#affiliate` tags as required by TikTok terms.
-14. **YouTube Production Integration**:
-    - **Google OAuth 2.0 Authorization**: Endpoints at `/api/integrations/youtube/connect`, `/api/integrations/youtube/callback`, `/api/integrations/youtube/disconnect`, `/api/integrations/youtube/channels`.
-    - **Multi-Channel Management**: Connect and manage multiple YouTube channels isolated by `workspaceId + platform + externalAccountId`.
-    - **YouTube Data API v3 Resumable Upload**: Direct video upload via `POST /upload/youtube/v3/videos?uploadType=resumable` supporting Title (100 char limit), Description (5000 char limit), Tags, Category ID (`28`), and Privacy Status (`public`, `private`, `unlisted`).
-    - **Custom Thumbnail Upload**: Support for custom video thumbnail setting via `POST /upload/youtube/v3/thumbnails/set`.
-    - **Affiliate Disclosure Safeguard**: Mandatory affiliate disclosure injection (`"Disclosure: This video contains affiliate links..."`) for commercial product posts.
-    - **Live Video Analytics**: `YouTubeAnalyticsAdapter` retrieving view counts, likes, and comments via `GET /v3/videos?part=statistics`.
-15. **Content Calendar & Automated Scheduler**: Universal background publishing dispatching through provider registry with idempotency, grace periods, and retry queues.
+9. **LinkedIn Production Integration**: OAuth 2.0, live REST publishing, image upload, member/organization posting and token refresh.
+10. **Threads Production Integration**: Meta OAuth, container publishing, status polling and insights analytics.
+11. **Pinterest Production Integration**: API v5 OAuth, board discovery, image Pin publishing and analytics.
+12. **Facebook Production Integration**: Graph API v25.0 OAuth, Page discovery, Page feed/photo publishing and insights.
+13. **TikTok Production Integration**: Content Posting API v2 OAuth, Creator Info, Direct Post, AI-generated disclosure and analytics permission handling.
+14. **YouTube Production Integration**: Google OAuth, multi-channel management, resumable video uploads, thumbnails, affiliate disclosure and analytics.
+15. **X Production Integration**:
+    - OAuth 2.0 Authorization Code with PKCE.
+    - Encrypted access/refresh token storage and automatic refresh.
+    - Multi-account workspace isolation through the existing SocialAccount service.
+    - X API v2 text posting via `POST /2/tweets`.
+    - X API v2 image upload via `/2/media/upload` and attachment through `POST /2/tweets`.
+    - 280-character platform-specific caption enforcement.
+    - Affiliate posts automatically receive `#ad #affiliate` disclosure tags when absent.
+    - Real post metrics adapter using `public_metrics`, with truthful unavailable responses when the current X API plan does not expose metrics.
+16. **Content Calendar & Automated Scheduler**: Universal background publishing dispatching through provider registry with idempotency, grace periods, and retry queues.
 
 ---
 
-## 📺 YouTube Integration Setup & Developer Guide
+## 🐦 X Integration Setup
 
-### 1. Google Cloud Console Configuration
-1. Log into the [Google Cloud Console](https://console.cloud.google.com/).
-2. Create or select a Project and enable the **YouTube Data API v3**.
-3. Under **OAuth consent screen**, configure:
-   - User type: External
-   - Scopes:
-     - `https://www.googleapis.com/auth/youtube.upload`: Upload YouTube videos
-     - `https://www.googleapis.com/auth/youtube.readonly`: Read YouTube channel & video details
-     - `https://www.googleapis.com/auth/yt-analytics.readonly`: Read YouTube analytics reports
-4. Create **OAuth 2.0 Client IDs** (Web application):
-   - Authorized redirect URIs:
-     - `http://localhost:3000/api/integrations/youtube/callback` (Development)
-     - `https://yourdomain.com/api/integrations/youtube/callback` (Production)
+Create an application in the X Developer Portal and configure OAuth 2.0 User Authentication with the callback URL:
 
-### 2. Environment Variables
-Add the following to `.env`:
-```env
-YOUTUBE_CLIENT_ID="your-youtube-client-id"
-YOUTUBE_CLIENT_SECRET="your-youtube-client-secret"
-YOUTUBE_REDIRECT_URI="http://localhost:3000/api/integrations/youtube/callback"
+```text
+http://localhost:3000/api/integrations/x/callback
 ```
+
+Request these scopes:
+
+```text
+tweet.read tweet.write users.read offline.access media.write
+```
+
+Set the following environment variables:
+
+```env
+X_CLIENT_ID="your-x-client-id"
+X_CLIENT_SECRET="your-x-client-secret"
+X_REDIRECT_URI="http://localhost:3000/api/integrations/x/callback"
+X_API_VERSION="v2"
+```
+
+The X integration uses the current X API v2 media upload flow rather than the deprecated v1.1 `media/upload.json` endpoint. X API access and rate/post caps depend on the developer plan attached to the application.
 
 ---
 
@@ -103,24 +90,17 @@ YOUTUBE_REDIRECT_URI="http://localhost:3000/api/integrations/youtube/callback"
 - **Database & ORM**: PostgreSQL & Prisma ORM v7
 - **Background Queues & Workers**: Redis & BullMQ
 - **Auth & Storage**: Supabase SSR Auth & Supabase Storage
-- **Testing**: Vitest (207 unit, integration, and E2E tests)
+- **Testing**: Vitest
 
 ---
 
 ## ⚡ Quick Start
 
 ```bash
-# Install dependencies
 npm install
-
-# Run database setup
 npx prisma validate
 npx prisma generate
 npx prisma db push
-
-# Start development server
 npm run dev
-
-# Run full test suite
 npm test
 ```
