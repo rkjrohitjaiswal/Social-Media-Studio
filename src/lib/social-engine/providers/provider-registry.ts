@@ -6,8 +6,8 @@ import { PinterestProvider } from "./pinterest-provider";
 import { FacebookProvider } from "./facebook-provider";
 import { TikTokProvider } from "./tiktok-provider";
 import { YouTubeProvider } from "./youtube-provider";
+import { XProvider } from "./x-provider";
 import {
-  XProvider,
   RedditProvider,
   TelegramProvider,
   BlueskyProvider,
@@ -43,9 +43,7 @@ class PlatformProviderRegistry {
 
   getProvider(platform: SocialPlatform): SocialPlatformProvider {
     const provider = this.providers.get(platform);
-    if (!provider) {
-      return new GenericMockPlatformProvider(platform);
-    }
+    if (!provider) return new GenericMockPlatformProvider(platform);
     return provider;
   }
 
