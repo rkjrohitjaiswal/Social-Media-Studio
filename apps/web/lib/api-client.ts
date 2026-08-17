@@ -107,16 +107,38 @@ export async function getBillingStatus(): Promise<BillingStatusResponse> {
 export async function createSubscriptionCheckout(
   plan: SubscriptionPlan = "PRO"
 ): Promise<CheckoutResponse> {
-  const res = await apiFetch("/api/billing/checkout", {
+  return subscribeToPlan(plan);
+}
+
+export async function subscribeToPlan(plan: SubscriptionPlan = "PRO"): Promise<CheckoutResponse> {
+  const res = await apiFetch("/api/billing/subscribe", {
     method: "POST",
     body: JSON.stringify({ plan }),
   });
   if (!res.ok) {
-    const errorMsg = await parseErrorMessage(res, "Failed to create checkout session");
+    const errorMsg = await parseErrorMessage(res, "Failed to create subscription order");
     throw new Error(errorMsg);
   }
   const body = (await (res.json() as Promise<unknown>)) as { data: CheckoutResponse };
   return body.data;
+}
+
+export async function verifyPayment(payload: {
+  razorpay_payment_id: string;
+  razorpay_subscription_id: string;
+  razorpay_signature: string;
+  plan: SubscriptionPlan;
+}): Promise<{ message: string }> {
+  const res = await apiFetch("/api/billing/verify", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const errorMsg = await parseErrorMessage(res, "Payment verification failed");
+    throw new Error(errorMsg);
+  }
+  const body = (await (res.json() as Promise<unknown>)) as { message: string };
+  return body;
 }
 
 export async function cancelSubscription(): Promise<{ message: string }> {

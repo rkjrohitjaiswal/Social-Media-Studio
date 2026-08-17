@@ -3,8 +3,9 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { CreditCard, Sparkles, Check, AlertCircle, ArrowLeft } from "lucide-react";
-import { getBillingStatus, createSubscriptionCheckout, cancelSubscription } from "@/lib/api-client";
+import { getBillingStatus, cancelSubscription } from "@/lib/api-client";
 import { BillingStatusResponse, SubscriptionPlan, SAAS_PLANS_REGISTRY } from "@ai-social/shared";
+import { handleRazorpaySubscribeFlow } from "@/lib/razorpay-checkout";
 
 export default function BillingSettingsPage() {
   const [billingStatus, setBillingStatus] = useState<BillingStatusResponse | null>(null);
@@ -31,17 +32,17 @@ export default function BillingSettingsPage() {
     setBillingMessage(null);
 
     try {
-      const checkout = await createSubscriptionCheckout(targetPlan);
-      if (checkout.checkoutUrl && checkout.checkoutUrl.startsWith("http")) {
-        window.location.assign(checkout.checkoutUrl);
-      } else {
-        setBillingMessage({
-          type: "success",
-          text: `Checkout session created for ${targetPlan} (₹${checkout.amountInr}/month). (Provider Order: ${checkout.orderId || checkout.subscriptionId})`,
-        });
-        const updatedStatus = await getBillingStatus();
-        setBillingStatus(updatedStatus);
-      }
+      await handleRazorpaySubscribeFlow(
+        targetPlan,
+        async (msg) => {
+          setBillingMessage({ type: "success", text: msg });
+          const updatedStatus = await getBillingStatus();
+          setBillingStatus(updatedStatus);
+        },
+        (err) => {
+          setBillingMessage({ type: "error", text: err });
+        }
+      );
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to initiate upgrade checkout";
       setBillingMessage({
@@ -157,7 +158,13 @@ export default function BillingSettingsPage() {
           </div>
         </div>
 
-        {billingStatus?.plan !== "FREE" && (
+        {billingStatus?.cancelAtPeriodEnd && (
+          <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs">
+            Your subscription will end on {billingStatus.currentPeriodEnd ? new Date(billingStatus.currentPeriodEnd).toLocaleDateString() : "the end of your current billing period"}.
+          </div>
+        )}
+
+        {billingStatus?.plan !== "FREE" && !billingStatus?.cancelAtPeriodEnd && (
           <div className="pt-2 flex justify-end">
             <button
               onClick={handleCancelSubscription}

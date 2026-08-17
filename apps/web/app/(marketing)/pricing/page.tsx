@@ -3,8 +3,8 @@
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Sparkles, Zap } from "lucide-react";
-import { createSubscriptionCheckout } from "@/lib/api-client";
 import { SAAS_PLANS_REGISTRY, SubscriptionPlan } from "@ai-social/shared";
+import { handleRazorpaySubscribeFlow } from "@/lib/razorpay-checkout";
 
 export default function PricingPage() {
   const router = useRouter();
@@ -18,13 +18,16 @@ export default function PricingPage() {
 
     setLoadingPlan(plan);
     try {
-      const checkout = await createSubscriptionCheckout(plan);
-      if (checkout.checkoutUrl && checkout.checkoutUrl.startsWith("http")) {
-        window.location.assign(checkout.checkoutUrl);
-      } else {
-        alert(`Checkout order created for ${plan} (₹${checkout.amountInr}/month). Submitting to payment gateway...`);
-        router.push("/settings");
-      }
+      await handleRazorpaySubscribeFlow(
+        plan,
+        (msg) => {
+          alert(msg);
+          router.push("/settings/billing");
+        },
+        (err) => {
+          alert(err);
+        }
+      );
     } catch (err: unknown) {
       alert(err instanceof Error ? err.message : "Failed to initiate checkout");
     } finally {

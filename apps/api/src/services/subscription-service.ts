@@ -171,4 +171,49 @@ export async function getFullBillingDetails(userId: string): Promise<BillingStat
 
 export function clearInMemorySubscriptions(): void {
   subscriptionMemoryStore.clear();
+  webhookEventsMemoryStore.clear();
+}
+
+const webhookEventsMemoryStore = new Set<string>();
+
+export async function isWebhookProcessed(provider: string, eventId: string): Promise<boolean> {
+  if (!eventId) return false;
+  const key = `${provider}:${eventId}`;
+  if (webhookEventsMemoryStore.has(key)) return true;
+
+  try {
+    const existing = await prisma.billingWebhookEvent.findUnique({
+      where: {
+        provider_eventId: {
+          provider,
+          eventId,
+        },
+      },
+    });
+    if (existing) {
+      webhookEventsMemoryStore.add(key);
+      return true;
+    }
+  } catch {
+    // DB fallback
+  }
+  return false;
+}
+
+export async function recordWebhookEvent(provider: string, eventId: string, eventType: string): Promise<void> {
+  if (!eventId) return;
+  const key = `${provider}:${eventId}`;
+  webhookEventsMemoryStore.add(key);
+
+  try {
+    await prisma.billingWebhookEvent.create({
+      data: {
+        provider,
+        eventId,
+        eventType,
+      },
+    });
+  } catch {
+    // Ignore duplicate insert
+  }
 }

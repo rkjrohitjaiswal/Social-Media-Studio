@@ -13,3 +13,11 @@ export const PLAN_PRICES: Record<string, number> = {
 
 export const FREE_CREDITS_DEFAULT = 3;
 export const CURRENCY_DEFAULT = "INR";
+
+export const RAZORPAY_PLAN_IDS: Record<string, string | undefined> = {
+  FREE: undefined,
+  PRO: process.env.RAZORPAY_PRO_PLAN_ID || "plan_test_pro_59",
+  ADVANCED: process.env.RAZORPAY_ADVANCED_PLAN_ID || "plan_test_adv_99",
+  PREMIUM: process.env.RAZORPAY_PREMIUM_PLAN_ID || "plan_test_prem_149",
+  BUSINESS: process.env.RAZORPAY_BUSINESS_PLAN_ID || "plan_test_biz_299",
+};
