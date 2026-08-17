@@ -5,6 +5,7 @@ import {
   QualityAssessmentResult,
 } from "../integrations/ai/quality-provider";
 import { dispatchN8nEvent } from "../integrations/n8n/event-dispatcher";
+import { getUserOpenAIApiKey } from "../services/credential-resolver.js";
 
 export interface QueueQualityState {
   id: string;
@@ -74,6 +75,7 @@ const assetApprovalMap = new Map<string, AssetApprovalRecord>(); // generatedAss
 export async function enqueueQualityAnalysisJob(params: {
   workspaceId: string;
   campaignId: string;
+  userId?: string;
   generatedAssetId: string;
   generatedAssetPath: string;
   referenceAssetPath: string;
@@ -141,6 +143,7 @@ async function executeQualityWorkerJob(
   params: {
     workspaceId: string;
     campaignId: string;
+    userId?: string;
     generatedAssetId: string;
     generatedAssetPath: string;
     referenceAssetPath: string;
@@ -158,7 +161,20 @@ async function executeQualityWorkerJob(
   assessment.attempts += 1;
   assessment.updatedAt = new Date().toISOString();
 
-  const provider = params.qualityProvider || new OpenAIImageQualityProvider();
+  let provider = params.qualityProvider;
+  if (!provider) {
+    let apiKey: string | undefined;
+    if (params.userId) {
+      try {
+        apiKey = await getUserOpenAIApiKey(params.userId);
+      } catch {
+        apiKey = process.env.OPENAI_API_KEY;
+      }
+    } else {
+      apiKey = process.env.OPENAI_API_KEY;
+    }
+    provider = new OpenAIImageQualityProvider(apiKey);
+  }
 
   try {
     const analysisParams: QualityAnalysisParams = {

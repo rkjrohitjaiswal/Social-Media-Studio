@@ -1,5 +1,6 @@
 import { AITextProvider, OpenAITextProvider, TextGenerationParams } from "../integrations/ai/text-provider";
 import { dispatchN8nEvent } from "../integrations/n8n/event-dispatcher";
+import { getUserOpenAIApiKey } from "../services/credential-resolver.js";
 
 export interface QueueCopyState {
   id: string;
@@ -12,7 +13,7 @@ export interface QueueCopyState {
   cta: string;
   altText: string;
   status: "QUEUED" | "PROCESSING" | "COMPLETED" | "FAILED";
-  approvalStatus: "PENDING" | "APPROVED" | "REJECTED";
+  approvalStatus: "PENDING" | "APPROVED" | "REJECTED" | "REVISION_REQUESTED";
   currentVersionNumber: number;
   provider: string;
   modelUsed?: string;
@@ -39,6 +40,7 @@ const assetCopyMap = new Map<string, string>(); // generatedAssetId -> copyId
 export async function enqueueSocialCopyJob(params: {
   workspaceId: string;
   campaignId: string;
+  userId?: string;
   generationJobId: string;
   generatedAssetId: string;
   brand: {
@@ -96,6 +98,7 @@ export async function enqueueSocialCopyJob(params: {
 async function executeCopyWorkerJob(
   copyId: string,
   params: {
+    userId?: string;
     brand: {
       name: string;
       description?: string | null;
@@ -120,7 +123,20 @@ async function executeCopyWorkerJob(
   copyState.attempts += 1;
   copyState.updatedAt = new Date().toISOString();
 
-  const provider = params.textProvider || new OpenAITextProvider();
+  let provider = params.textProvider;
+  if (!provider) {
+    let apiKey: string | undefined;
+    if (params.userId) {
+      try {
+        apiKey = await getUserOpenAIApiKey(params.userId);
+      } catch {
+        apiKey = process.env.OPENAI_API_KEY;
+      }
+    } else {
+      apiKey = process.env.OPENAI_API_KEY;
+    }
+    provider = new OpenAITextProvider(apiKey);
+  }
 
   try {
     const textParams: TextGenerationParams = {

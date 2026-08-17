@@ -71,8 +71,8 @@ export class OpenAIImageQualityProvider implements AIImageQualityProvider {
   private apiKey: string | undefined;
   private model: string;
 
-  constructor() {
-    this.apiKey = process.env.OPENAI_API_KEY;
+  constructor(apiKey?: string) {
+    this.apiKey = apiKey || process.env.OPENAI_API_KEY;
     this.model = process.env.OPENAI_IMAGE_MODEL || "gpt-image-2";
   }
 

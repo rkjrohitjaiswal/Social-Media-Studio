@@ -20,7 +20,8 @@
     "worker:publishing": "npm run worker:publishing --workspace=@ai-social/api",
     "worker:analytics": "npm run worker:analytics --workspace=@ai-social/api",
     "db:generate": "npm run db:generate --workspace=@ai-social/database",
-    "db:push": "npm run db:push --workspace=@ai-social/database"
+    "db:push": "npm run db:push --workspace=@ai-social/database",
+    "seed:test-user": "tsx scripts/seed-test-user.ts"
   },
   "dependencies": {
     "@prisma/client": "^7.9.1",

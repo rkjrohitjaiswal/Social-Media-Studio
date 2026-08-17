@@ -17,12 +17,17 @@ import {
   LogOut,
   PlusCircle,
   Search,
-  User as UserIcon
+  Share2,
+  User as UserIcon,
+  Zap,
+  Check,
 } from "lucide-react";
 
 import { InstagramIcon as Instagram } from "@/components/ui/InstagramIcon";
 import { useStudio } from "@/lib/studio-context";
 import { createClient } from "@/lib/supabase/client";
+import { getBillingStatus } from "@/lib/api-client";
+import { BillingStatusResponse } from "@ai-social/shared";
 
 export default function StudioLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -31,6 +36,7 @@ export default function StudioLayout({ children }: { children: React.ReactNode }
   const [showBrandDropdown, setShowBrandDropdown] = useState(false);
   const [showNotifDropdown, setShowNotifDropdown] = useState(false);
   const [userProfile, setUserProfile] = useState<{ name: string; email: string } | null>(null);
+  const [billingInfo, setBillingInfo] = useState<BillingStatusResponse | null>(null);
 
   const unreadNotifsCount = notifications.filter((n) => !n.read).length;
 
@@ -55,6 +61,10 @@ export default function StudioLayout({ children }: { children: React.ReactNode }
     }
 
     loadUserSession();
+
+    getBillingStatus()
+      .then((data) => setBillingInfo(data))
+      .catch(() => {});
   }, []);
 
   const handleSignOut = async () => {
@@ -69,10 +79,12 @@ export default function StudioLayout({ children }: { children: React.ReactNode }
     { name: "Create Content", href: "/create", icon: PlusCircle, isPrimary: true },
     { name: "Campaigns", href: "/campaigns", icon: FolderKanban },
     { name: "Content Review", href: "/content-review", icon: CheckCircle2, badge: "Multi" },
+    { name: "Repurpose Studio", href: "/create/repurpose", icon: Share2 },
     { name: "Editorial Calendar", href: "/calendar", icon: CalendarDays },
     { name: "Social Accounts", href: "/settings/social-accounts", icon: UserIcon },
     { name: "Published Feed", href: "/published", icon: Instagram },
     { name: "Analytics", href: "/analytics", icon: BarChart3 },
+    { name: "AI Advisor", href: "/analytics/advisor", icon: Sparkles },
     { name: "Brand Identity", href: "/brand", icon: Palette },
     { name: "Settings", href: "/settings", icon: Settings },
   ];
@@ -204,7 +216,7 @@ export default function StudioLayout({ children }: { children: React.ReactNode }
           </nav>
         </div>
 
-        {/* FOOTER USER USER METRICS & PROFILE MENU */}
+        {/* FOOTER USER METRICS & PROFILE MENU */}
         <div className="p-4 border-t border-white/10 bg-[#0b0c0e]/50">
           <div className="p-3 rounded-xl bg-[#1c1f26] border border-white/5 flex items-center justify-between">
             <div className="flex items-center gap-3 truncate">
@@ -243,6 +255,20 @@ export default function StudioLayout({ children }: { children: React.ReactNode }
           </div>
 
           <div className="flex items-center gap-4">
+            {/* LIVE USAGE / SUBSCRIPTION BADGE */}
+            <Link href="/settings" className="no-underline">
+              {billingInfo?.plan && billingInfo.plan !== "FREE" && billingInfo.status === "ACTIVE" ? (
+                <span className="px-3 py-1 rounded-full bg-[#4e8765]/20 border border-[#4e8765]/40 text-[#4e8765] text-xs font-bold flex items-center gap-1.5 hover:bg-[#4e8765]/30 transition-colors">
+                  <Check className="w-3.5 h-3.5" /> {billingInfo.plan} ✓
+                </span>
+              ) : (
+                <span className="px-3 py-1 rounded-full bg-[#c5a059]/15 border border-[#c5a059]/40 text-[#c5a059] text-xs font-bold flex items-center gap-1.5 hover:bg-[#c5a059]/25 transition-colors">
+                  <Zap className="w-3.5 h-3.5" />
+                  <span>{billingInfo?.workflowsRemaining ?? 3} Free Uses</span>
+                </span>
+              )}
+            </Link>
+
             <Link
               href="/"
               className="text-xs text-[#9e9d98] hover:text-[#c5a059] font-medium transition-colors hidden md:block"

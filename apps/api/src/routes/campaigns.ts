@@ -55,8 +55,23 @@ campaignsRouter.get("/:id/readiness", (req: AuthenticatedRequest, res: Response)
   res.json({ success: true, data: readiness });
 });
 
-campaignsRouter.post("/:id/generate/run", (req: AuthenticatedRequest, res: Response) => {
-  res.json({
+import { checkUsageAccess, consumeUsage } from "../services/usage-service.js";
+
+campaignsRouter.post("/:id/generate/run", async (req: AuthenticatedRequest, res: Response) => {
+  const userId = req.user!.id;
+  const access = await checkUsageAccess(userId, "CONTENT_GENERATION");
+
+  if (!access.allowed) {
+    return res.status(403).json({
+      code: access.code || "SUBSCRIPTION_REQUIRED",
+      message: access.message || "Your 3 free uses are finished. Upgrade to Pro to continue.",
+    });
+  }
+
+  // Consume exactly 1 credit for the complete generation workflow
+  await consumeUsage(userId, "CONTENT_GENERATION");
+
+  return res.json({
     success: true,
     data: {
       runId: `run-${Date.now()}`,
@@ -79,8 +94,19 @@ campaignsRouter.get("/:id/generate/events", (req: AuthenticatedRequest, res: Res
   }, 1000);
 });
 
-campaignsRouter.post("/:id/generate", (req: AuthenticatedRequest, res: Response) => {
-  res.json({ success: true, message: "Generation triggered" });
+campaignsRouter.post("/:id/generate", async (req: AuthenticatedRequest, res: Response) => {
+  const userId = req.user!.id;
+  const access = await checkUsageAccess(userId, "CONTENT_GENERATION");
+
+  if (!access.allowed) {
+    return res.status(403).json({
+      code: access.code || "SUBSCRIPTION_REQUIRED",
+      message: access.message || "Your 3 free uses are finished. Upgrade to Pro to continue.",
+    });
+  }
+
+  await consumeUsage(userId, "CONTENT_GENERATION");
+  return res.json({ success: true, message: "Generation triggered" });
 });
 
 campaignsRouter.post("/:id/generate/retry", (req: AuthenticatedRequest, res: Response) => {

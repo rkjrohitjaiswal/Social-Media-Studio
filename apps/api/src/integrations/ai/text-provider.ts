@@ -86,8 +86,8 @@ export class OpenAITextProvider implements AITextProvider {
   private apiKey: string | undefined;
   private model: string;
 
-  constructor() {
-    this.apiKey = process.env.OPENAI_API_KEY;
+  constructor(apiKey?: string) {
+    this.apiKey = apiKey || process.env.OPENAI_API_KEY;
     this.model = process.env.OPENAI_TEXT_MODEL || "gpt-4o-mini";
   }
 

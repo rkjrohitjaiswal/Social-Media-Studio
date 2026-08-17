@@ -6,6 +6,14 @@ import { campaignsRouter } from "./routes/campaigns.js";
 import { analyticsRouter } from "./routes/analytics.js";
 import { integrationsRouter } from "./routes/integrations.js";
 import { n8nRouter } from "./routes/n8n.js";
+import { settingsRouter } from "./routes/settings.js";
+import { billingRouter } from "./routes/billing.js";
+import { contentRouter } from "./routes/content.js";
+import { advisorRouter } from "./routes/advisor.js";
+import { workspacesRouter } from "./routes/workspaces.js";
+import { invitationsRouter } from "./routes/invitations.js";
+import { approvalsRouter } from "./routes/approvals.js";
+import { approvalLinksRouter } from "./routes/approval-links.js";
 
 dotenv.config();
 
@@ -22,11 +30,10 @@ const allowedOrigins = [
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow requests with no origin (like mobile apps, curl, or server-to-server)
       if (!origin || allowedOrigins.includes(origin)) {
         callback(null, true);
       } else {
-        callback(null, true); // Permissive in dev, or restricted by domain
+        callback(null, true);
       }
     },
     credentials: true,
@@ -45,8 +52,16 @@ app.get("/health", (req, res) => {
 app.use("/api/brand", brandRouter);
 app.use("/api/campaigns", campaignsRouter);
 app.use("/api/analytics", analyticsRouter);
+app.use("/api/analytics/advisor", advisorRouter);
+app.use("/api/content", contentRouter);
 app.use("/api/integrations/n8n", n8nRouter);
 app.use("/api/integrations", integrationsRouter);
+app.use("/api/settings", settingsRouter);
+app.use("/api/billing", billingRouter);
+app.use("/api/workspaces", workspacesRouter);
+app.use("/api/invitations", invitationsRouter);
+app.use("/api/approvals", approvalsRouter);
+app.use("/api/approval-links", approvalLinksRouter);
 
 // Start HTTP Server
 if (process.env.NODE_ENV !== "test") {

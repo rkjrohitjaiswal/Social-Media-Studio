@@ -1,5 +1,6 @@
 import { getSupabaseAdminClient } from "../../config/supabase.js";
 import { AIImageProvider, OpenAIImageProvider, GeneratedImage, ProviderError } from "./provider";
+import { getUserOpenAIApiKey } from "../../services/credential-resolver.js";
 
 export interface GenerationPromptParams {
   brandName: string;
@@ -36,6 +37,7 @@ export interface ExecuteJobParams {
   runId: string;
   workspaceId: string;
   campaignId: string;
+  userId?: string;
   brandName: string;
   brandTone: string;
   contentStyle?: string | null;
@@ -49,7 +51,20 @@ export interface ExecuteJobParams {
 }
 
 export async function executeSingleJob(params: ExecuteJobParams) {
-  const provider = params.provider || new OpenAIImageProvider();
+  let provider = params.provider;
+  if (!provider) {
+    let apiKey: string | undefined;
+    if (params.userId) {
+      try {
+        apiKey = await getUserOpenAIApiKey(params.userId);
+      } catch {
+        apiKey = process.env.OPENAI_API_KEY;
+      }
+    } else {
+      apiKey = process.env.OPENAI_API_KEY;
+    }
+    provider = new OpenAIImageProvider(apiKey);
+  }
   const supabase = getSupabaseAdminClient();
 
   // Deterministic generated asset storage path

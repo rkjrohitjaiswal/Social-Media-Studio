@@ -162,15 +162,21 @@ enum ContentType {
 }
 
 model User {
-  id            String            @id @default(uuid())
-  email         String            @unique
-  fullName      String?
-  avatarUrl     String?
-  supabaseUid   String            @unique
-  createdAt     DateTime          @default(now())
-  updatedAt     DateTime          @updatedAt
-  memberships   WorkspaceMember[]
-  approvals     Approval[]
+  id             String              @id @default(uuid())
+  email          String              @unique
+  fullName       String?
+  firstName      String?
+  lastName       String?
+  avatarUrl      String?
+  supabaseUid    String              @unique
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+  memberships    WorkspaceMember[]
+  approvals      Approval[]
+  apiCredentials UserApiCredential[]
+  usage          UserUsage?
+  subscription   Subscription?
+  brandProfile   BrandProfile?
 }
 
 model Workspace {
@@ -182,6 +188,8 @@ model Workspace {
   createdAt               DateTime                @default(now())
   updatedAt               DateTime                @updatedAt
   members                 WorkspaceMember[]
+  invitations             WorkspaceInvitation[]
+  approvalRequests        ApprovalRequest[]
   brands                  Brand[]
   campaigns               Campaign[]
   mediaAssets             MediaAsset[]
@@ -831,5 +839,203 @@ model N8nWebhookDelivery {
   @@index([status])
   @@index([nextAttemptAt])
   @@index([createdAt])
+}
+
+enum ApiProvider {
+  OPENAI
+  GEMINI
+  ANTHROPIC
+  DEEPSEEK
+}
+
+enum UsageAction {
+  CONTENT_GENERATION
+}
+
+enum SubscriptionPlan {
+  FREE
+  PRO
+  ADVANCED
+  PREMIUM
+  BUSINESS
+}
+
+enum SubscriptionStatus {
+  TRIAL
+  ACTIVE
+  PAST_DUE
+  CANCELLED
+  EXPIRED
+}
+
+enum BillingProvider {
+  RAZORPAY
+}
+
+enum PaymentProviderType {
+  RAZORPAY
+}
+
+model UserApiCredential {
+  id              String      @id @default(uuid())
+  userId          String
+  provider        ApiProvider @default(OPENAI)
+  encryptedApiKey String
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  user            User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, provider])
+  @@index([userId])
+  @@index([provider])
+}
+
+model UserUsage {
+  id               String   @id @default(uuid())
+  userId           String   @unique
+  freeCreditsTotal Int      @default(3)
+  freeCreditsUsed  Int      @default(0)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Subscription {
+  id                     String             @id @default(uuid())
+  userId                 String             @unique
+  provider               BillingProvider    @default(RAZORPAY)
+  providerCustomerId     String?
+  providerSubscriptionId String?            @unique
+  plan                   SubscriptionPlan   @default(FREE)
+  status                 SubscriptionStatus @default(EXPIRED)
+  currentPeriodStart     DateTime?
+  currentPeriodEnd       DateTime?
+  cancelAtPeriodEnd      Boolean            @default(false)
+  createdAt              DateTime           @default(now())
+  updatedAt              DateTime           @updatedAt
+  user                   User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+}
+
+enum WorkspaceRole {
+  OWNER
+  ADMIN
+  EDITOR
+  REVIEWER
+  VIEWER
+}
+
+enum ApprovalWorkflowStatus {
+  DRAFT
+  IN_REVIEW
+  CHANGES_REQUESTED
+  APPROVED
+  SCHEDULED
+  PUBLISHED
+}
+
+enum ApprovalAuditAction {
+  SUBMITTED
+  APPROVED
+  CHANGES_REQUESTED
+  REVOKED
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  REVOKED
+  EXPIRED
+}
+
+model BrandProfile {
+  id                         String   @id @default(uuid())
+  userId                     String   @unique
+  brandName                  String
+  description                String?
+  industry                   String?
+  website                    String?
+  targetAudience             String?
+  location                   String?
+  language                   String   @default("English")
+  timezone                   String   @default("UTC")
+  tone                       String?
+  personality                String?
+  writingStyle               String?
+  preferredVocabulary        String?
+  wordsToAvoid               String?
+  preferredCallToActionStyle String?
+  emojiPreference            String?
+  hashtagStyle               String?
+  logo                       String?
+  primaryColor               String?
+  secondaryColor             String?
+  accentColor                String?
+  fontPreference             String?
+  preferredContentTypes      String?
+  preferredPlatforms         String?
+  postingGoals               String?
+  contentTopics              String?
+  contentTopicsToAvoid       String?
+  createdAt                  DateTime @default(now())
+  updatedAt                  DateTime @updatedAt
+  user                       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model WorkspaceInvitation {
+  id          String           @id @default(uuid())
+  workspaceId String
+  email       String
+  role        WorkspaceRole    @default(EDITOR)
+  token       String           @unique
+  status      InvitationStatus @default(PENDING)
+  expiresAt   DateTime
+  createdAt   DateTime         @default(now())
+  workspace   Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+  @@index([token])
+}
+
+model ApprovalRequest {
+  id            String                 @id @default(uuid())
+  workspaceId   String
+  contentTitle  String
+  caption       String
+  platform      SocialPlatform
+  previewUrl    String?
+  status        ApprovalWorkflowStatus @default(IN_REVIEW)
+  submittedById String
+  reviewedById  String?
+  clientToken   String                 @unique
+  expiresAt     DateTime?
+  createdAt     DateTime               @default(now())
+  updatedAt     DateTime               @updatedAt
+  workspace     Workspace              @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  auditLogs     ApprovalAuditLog[]
+
+  @@index([workspaceId])
+  @@index([clientToken])
+  @@index([status])
+}
+
+model ApprovalAuditLog {
+  id                String              @id @default(uuid())
+  approvalRequestId String
+  action            ApprovalAuditAction
+  actorId           String?
+  actorName         String?
+  actorRole         String?
+  comment           String?
+  createdAt         DateTime            @default(now())
+  approvalRequest   ApprovalRequest     @relation(fields: [approvalRequestId], references: [id], onDelete: Cascade)
+
+  @@index([approvalRequestId])
 }
 

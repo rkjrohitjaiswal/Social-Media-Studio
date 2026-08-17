@@ -3,8 +3,15 @@ import crypto from "crypto";
 const ALGORITHM = "aes-256-gcm";
 
 function getEncryptionKey(): Buffer {
-  const key = process.env.INSTAGRAM_TOKEN_ENCRYPTION_KEY || "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
-  return Buffer.from(key.substring(0, 64), "hex");
+  const rawKey =
+    process.env.USER_CREDENTIAL_ENCRYPTION_KEY ||
+    process.env.INSTAGRAM_TOKEN_ENCRYPTION_KEY ||
+    "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+
+  if (/^[0-9a-fA-F]{64}$/.test(rawKey)) {
+    return Buffer.from(rawKey, "hex");
+  }
+  return crypto.createHash("sha256").update(rawKey).digest();
 }
 
 export function encryptToken(plaintext: string): string {
@@ -41,6 +48,8 @@ export function decryptToken(encryptedString: string): string {
 
 export const encryptSecret = encryptToken;
 export const decryptSecret = decryptToken;
+export const encryptUserCredential = encryptToken;
+export const decryptUserCredential = decryptToken;
 
 export function generatePKCEChallenge(): { codeVerifier: string; codeChallenge: string } {
   const codeVerifier = crypto.randomBytes(32).toString("base64url");

@@ -7,6 +7,7 @@ export interface QueueJobState {
   runId: string;
   workspaceId: string;
   campaignId: string;
+  userId?: string;
   inputAssetId: string;
   referenceAssetId: string;
   status: "QUEUED" | "PROCESSING" | "COMPLETED" | "FAILED" | "CANCELLED";
@@ -26,6 +27,7 @@ export interface QueueRunState {
   idempotencyKey: string;
   workspaceId: string;
   campaignId: string;
+  userId?: string;
   status: "QUEUED" | "PROCESSING" | "COMPLETED" | "PARTIAL_FAILURE" | "FAILED" | "CANCELLED";
   totalJobs: number;
   completedJobs: number;
@@ -44,6 +46,7 @@ const campaignActiveRunMap = new Map<string, string>(); // campaignId -> runId
 export function createGenerationRun(params: {
   workspaceId: string;
   campaignId: string;
+  userId?: string;
   idempotencyKey?: string;
   brandName: string;
   brandTone: string;
@@ -70,6 +73,7 @@ export function createGenerationRun(params: {
     runId,
     workspaceId: params.workspaceId,
     campaignId: params.campaignId,
+    userId: params.userId,
     inputAssetId: inp.id,
     referenceAssetId: params.referenceAsset.id,
     status: "QUEUED",
@@ -84,6 +88,7 @@ export function createGenerationRun(params: {
     idempotencyKey: key,
     workspaceId: params.workspaceId,
     campaignId: params.campaignId,
+    userId: params.userId,
     status: "QUEUED",
     totalJobs: jobs.length,
     completedJobs: 0,
@@ -117,6 +122,7 @@ async function startWorkerExecution(
   params: {
     workspaceId: string;
     campaignId: string;
+    userId?: string;
     brandName: string;
     brandTone: string;
     contentStyle?: string | null;
@@ -165,6 +171,7 @@ async function startWorkerExecution(
               runId: run.id,
               workspaceId: params.workspaceId,
               campaignId: params.campaignId,
+              userId: params.userId,
               brandName: params.brandName,
               brandTone: params.brandTone,
               contentStyle: params.contentStyle,

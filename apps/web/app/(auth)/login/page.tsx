@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { Sparkles, ArrowRight, Lock, Mail, AlertCircle, Loader2 } from "lucide-react";
+import { Sparkles, ArrowRight, Lock, Mail, AlertCircle, Loader2, Eye, EyeOff } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { loginSchema } from "@ai-social/shared";
 
@@ -12,6 +12,7 @@ export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("director@maisonlumiere.com");
   const [password, setPassword] = useState("password123");
+  const [showPassword, setShowPassword] = useState(false);
   const [rememberSession, setRememberSession] = useState(true);
 
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
@@ -46,7 +47,13 @@ export default function LoginPage() {
       });
 
       if (error) {
-        setAuthError(error.message || "Invalid authentication credentials.");
+        if (error.message === "Failed to fetch" || error.message?.includes("Failed to fetch")) {
+          setAuthError(
+            "Unable to connect to Supabase Auth server. Please verify NEXT_PUBLIC_SUPABASE_URL in your environment."
+          );
+        } else {
+          setAuthError(error.message || "Invalid authentication credentials.");
+        }
         setIsLoading(false);
         return;
       }
@@ -54,8 +61,15 @@ export default function LoginPage() {
       // Successful login -> Redirect to /dashboard
       router.push("/dashboard");
       router.refresh();
-    } catch {
-      setAuthError("An unexpected authentication error occurred. Please try again.");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.includes("Failed to fetch")) {
+        setAuthError(
+          "Unable to connect to Supabase Auth server. Please verify NEXT_PUBLIC_SUPABASE_URL in your environment."
+        );
+      } else {
+        setAuthError("An unexpected authentication error occurred. Please try again.");
+      }
       setIsLoading(false);
     }
   };
@@ -123,7 +137,9 @@ export default function LoginPage() {
           </div>
 
           <div className="space-y-2">
-            <h1 className="font-serif-luxury text-3xl md:text-4xl font-bold text-[#f5f4f0]">Client Sign In</h1>
+            <h1 className="font-serif-luxury text-3xl md:text-4xl font-bold text-[#f5f4f0]">
+              Welcome to AI Social Media Studio
+            </h1>
             <p className="text-xs text-[#9e9d98]">Enter your accredited email and password to access the studio.</p>
           </div>
 
@@ -169,15 +185,23 @@ export default function LoginPage() {
               <div className="relative">
                 <Lock className="w-4 h-4 text-[#9e9d98] absolute left-3.5 top-1/2 -translate-y-1/2" />
                 <input
-                  type="password"
+                  type={showPassword ? "text" : "password"}
                   placeholder="••••••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className={`w-full bg-[#14161a] border rounded-xl pl-10 pr-4 py-3 text-xs text-[#f5f4f0] focus:border-[#c5a059] focus:outline-none transition-colors ${
+                  className={`w-full bg-[#14161a] border rounded-xl pl-10 pr-10 py-3 text-xs text-[#f5f4f0] focus:border-[#c5a059] focus:outline-none transition-colors ${
                     validationErrors.password ? "border-[#a84b4b]" : "border-white/10"
                   }`}
                   disabled={isLoading}
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#9e9d98] hover:text-[#f5f4f0] focus:outline-none"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
               </div>
               {validationErrors.password && (
                 <p className="text-[11px] text-[#a84b4b] mt-1">{validationErrors.password}</p>
@@ -219,9 +243,9 @@ export default function LoginPage() {
           </form>
 
           <div className="text-center text-xs text-[#9e9d98] pt-6 border-t border-white/10">
-            Don&apos;t have an Atelier workspace?{" "}
+            Don&apos;t have an account?{" "}
             <Link href="/signup" className="text-[#c5a059] hover:underline font-semibold">
-              Apply for Access
+              Sign Up
             </Link>
           </div>
         </div>
