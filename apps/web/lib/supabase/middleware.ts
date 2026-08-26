@@ -62,14 +62,22 @@ export async function updateSession(request: NextRequest) {
   if (!user && !isDevBypass && isProtectedPath) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
-    return NextResponse.redirect(url);
+    const response = NextResponse.redirect(url);
+    supabaseResponse.cookies.getAll().forEach((c) => {
+      response.cookies.set(c.name, c.value, c);
+    });
+    return response;
   }
 
   // If user IS authenticated and trying to access auth pages -> redirect to /dashboard
   if (user && isAuthPath) {
     const url = request.nextUrl.clone();
     url.pathname = "/dashboard";
-    return NextResponse.redirect(url);
+    const response = NextResponse.redirect(url);
+    supabaseResponse.cookies.getAll().forEach((c) => {
+      response.cookies.set(c.name, c.value, c);
+    });
+    return response;
   }
 
   return supabaseResponse;

@@ -59,9 +59,9 @@ export default function LoginPage() {
         return;
       }
 
-      // Successful login -> Redirect to /dashboard
-      router.push("/dashboard");
+      // Successful login -> Refresh RSC auth state then navigate to /dashboard
       router.refresh();
+      router.push("/dashboard");
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       if (msg.includes("Failed to fetch")) {
