@@ -15,6 +15,7 @@ import {
   ChevronRight,
   RotateCcw,
   Zap,
+  ShieldCheck,
 } from "lucide-react";
 
 interface N8nIntegration {
@@ -347,6 +348,30 @@ export default function N8nSettingsPage() {
           >
             <Plus className="w-4 h-4" /> Add Integration
           </button>
+        </div>
+      </div>
+
+      {/* INBOUND WEBHOOK CALLBACK CONFIGURATION CARD */}
+      <div className="glass-card p-6 rounded-3xl space-y-3 border-l-4 border-l-[#c5a059] bg-[#14161a]">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 text-xs font-mono font-bold text-[#c5a059] uppercase tracking-wider">
+            <ShieldCheck className="w-4 h-4 text-[#c5a059]" />
+            <span>Inbound Webhook Callback Endpoint</span>
+          </div>
+          <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+            HMAC SECURED
+          </span>
+        </div>
+        <p className="text-xs text-[#9e9d98]">
+          External n8n workflows can send status updates and render completion events back to AI Social Media Studio using HMAC-SHA256 request signing.
+        </p>
+        <div className="flex items-center gap-3 bg-[#0b0c0e] p-3 rounded-xl border border-white/10 text-xs font-mono text-[#f5f4f0] select-all">
+          <span className="text-[#9e9d98] uppercase">Endpoint:</span>
+          <code className="text-[#c5a059]">{(process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000")}/api/integrations/n8n/webhook-callback</code>
+        </div>
+        <div className="flex items-center justify-between text-[11px] text-[#9e9d98]">
+          <span>Header: <code className="text-[#f5f4f0]">X-Studio-Signature: sha256=&lt;hmac_hex&gt;</code></span>
+          <span className="text-amber-400 font-bold">Signing secrets are stored as encrypted hashes and never exposed</span>
         </div>
       </div>
 

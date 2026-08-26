@@ -2,6 +2,8 @@ import { Router, Response } from "express";
 import { AuthenticatedRequest, requireAuth } from "../middleware/auth.js";
 import { checkCampaignReadinessServer } from "@ai-social/shared";
 
+import { prisma } from "@ai-social/database";
+
 export const campaignsRouter = Router();
 
 campaignsRouter.use(requireAuth as any);
@@ -19,8 +21,29 @@ const mockCampaigns: any[] = [
   },
 ];
 
-campaignsRouter.get("/", (req: AuthenticatedRequest, res: Response) => {
-  res.json({ success: true, data: mockCampaigns });
+campaignsRouter.get("/", async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const userId = req.user!.id;
+    const dbAiCampaigns = await prisma.aiCampaign.findMany({
+      where: { userId },
+      orderBy: { createdAt: "desc" },
+    });
+
+    const formattedAiCampaigns = (dbAiCampaigns || []).map((c: any) => ({
+      id: c.id,
+      name: c.name,
+      description: c.objective || c.positioning || "AI Strategic Campaign",
+      status: "READY",
+      brandName: c.targetAudience || "Brand Studio",
+      inputCount: Array.isArray(c.topicsJson) ? c.topicsJson.length : 1,
+      createdAt: c.createdAt ? new Date(c.createdAt).toISOString() : new Date().toISOString(),
+    }));
+
+    const campaigns = [...formattedAiCampaigns, ...mockCampaigns];
+    return res.json({ success: true, campaigns, data: campaigns });
+  } catch {
+    return res.json({ success: true, campaigns: mockCampaigns, data: mockCampaigns });
+  }
 });
 
 campaignsRouter.post("/", (req: AuthenticatedRequest, res: Response) => {

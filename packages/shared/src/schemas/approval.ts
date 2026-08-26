@@ -17,6 +17,8 @@ export const createApprovalRequestSchema = z.object({
   caption: z.string().min(1, "Caption is required"),
   platform: z.string().default("INSTAGRAM"),
   previewUrl: z.string().optional(),
+  contentPlanItemId: z.string().optional(),
+  aiCampaignId: z.string().optional(),
 });
 
 export type CreateApprovalRequestInput = z.infer<typeof createApprovalRequestSchema>;
@@ -50,6 +52,8 @@ export interface ApprovalRequestResponse {
   reviewedById?: string;
   clientToken: string;
   clientApprovalUrl: string;
+  contentPlanItemId?: string;
+  aiCampaignId?: string;
   expiresAt?: string;
   createdAt: string;
   updatedAt: string;

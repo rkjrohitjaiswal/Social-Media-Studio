@@ -5,38 +5,46 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   Sparkles,
-  LayoutDashboard,
+  Home,
   FolderKanban,
-  CheckCircle2,
-  CalendarDays,
+  PlusCircle,
+  Share2,
+  Calendar,
+  Clock,
   BarChart3,
-  Palette,
+  Link as LinkIcon,
   Settings,
+  HelpCircle,
+  User,
   ChevronDown,
   Bell,
   LogOut,
-  PlusCircle,
   Search,
-  Share2,
-  User as UserIcon,
-  Zap,
-  Check,
+  Menu,
+  X,
+  Building2,
 } from "lucide-react";
-
-import { InstagramIcon as Instagram } from "@/components/ui/InstagramIcon";
 import { useStudio } from "@/lib/studio-context";
 import { createClient } from "@/lib/supabase/client";
-import { getBillingStatus } from "@/lib/api-client";
-import { BillingStatusResponse } from "@ai-social/shared";
+import { GlobalSearchModal } from "@/components/studio/GlobalSearchModal";
 
 export default function StudioLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { brands, activeBrand, setActiveBrand, notifications, markNotificationsRead } = useStudio();
-  const [showBrandDropdown, setShowBrandDropdown] = useState(false);
+  const {
+    notifications,
+    markNotificationsRead,
+    workspaces,
+    activeWorkspace,
+    setActiveWorkspace,
+  } = useStudio();
+
+  const [showWorkspaceDropdown, setShowWorkspaceDropdown] = useState(false);
+  const [showUserDropdown, setShowUserDropdown] = useState(false);
   const [showNotifDropdown, setShowNotifDropdown] = useState(false);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [userProfile, setUserProfile] = useState<{ name: string; email: string } | null>(null);
-  const [billingInfo, setBillingInfo] = useState<BillingStatusResponse | null>(null);
 
   const unreadNotifsCount = notifications.filter((n) => !n.read).length;
 
@@ -49,22 +57,18 @@ export default function StudioLayout({ children }: { children: React.ReactNode }
 
       if (user) {
         setUserProfile({
-          name: user.user_metadata?.full_name || user.email?.split("@")[0] || "Creative Director",
-          email: user.email || "director@maisonlumiere.com",
+          name: user.user_metadata?.full_name || user.email?.split("@")[0] || "Alex",
+          email: user.email || "alex@studio.io",
         });
       } else {
         setUserProfile({
-          name: "Claire Laurent",
-          email: "director@maisonlumiere.com",
+          name: "Alex",
+          email: "alex@studio.io",
         });
       }
     }
 
     loadUserSession();
-
-    getBillingStatus()
-      .then((data) => setBillingInfo(data))
-      .catch(() => {});
   }, []);
 
   const handleSignOut = async () => {
@@ -74,255 +78,367 @@ export default function StudioLayout({ children }: { children: React.ReactNode }
     router.refresh();
   };
 
-  const navItems = [
-    { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-    { name: "Create Content", href: "/create", icon: PlusCircle, isPrimary: true },
-    { name: "Campaigns", href: "/campaigns", icon: FolderKanban },
-    { name: "Content Review", href: "/content-review", icon: CheckCircle2, badge: "Multi" },
-    { name: "Repurpose Studio", href: "/create/repurpose", icon: Share2 },
-    { name: "Editorial Calendar", href: "/calendar", icon: CalendarDays },
-    { name: "Social Accounts", href: "/settings/social-accounts", icon: UserIcon },
-    { name: "Published Feed", href: "/published", icon: Instagram },
-    { name: "Analytics", href: "/analytics", icon: BarChart3 },
-    { name: "AI Advisor", href: "/analytics/advisor", icon: Sparkles },
-    { name: "Brand Identity", href: "/brand", icon: Palette },
-    { name: "Settings", href: "/settings", icon: Settings },
+  const navSections = [
+    {
+      group: "WORKSPACE",
+      items: [
+        { name: "Home", href: "/dashboard", icon: Home },
+        { name: "Projects", href: "/content-studio", icon: FolderKanban },
+      ],
+    },
+    {
+      group: "CREATE",
+      items: [
+        { name: "Create", href: "/create", icon: PlusCircle },
+        { name: "Repurpose", href: "/repurpose", icon: Share2 },
+      ],
+    },
+    {
+      group: "PUBLISH",
+      items: [
+        { name: "Calendar", href: "/calendar/ai", icon: Calendar },
+        { name: "Publish Queue", href: "/published", icon: Clock },
+      ],
+    },
+    {
+      group: "INSIGHTS",
+      items: [{ name: "Analytics", href: "/analytics", icon: BarChart3 }],
+    },
+    {
+      group: "CONNECT",
+      items: [{ name: "Connections", href: "/settings/social-accounts", icon: LinkIcon }],
+    },
   ];
 
-  return (
-    <div className="flex min-h-screen bg-[#0b0c0e] text-[#f5f4f0]">
-      {/* LEFT SIDEBAR NAVIGATION */}
-      <aside className="w-72 flex-shrink-0 border-r border-white/10 bg-[#14161a]/80 backdrop-blur-xl flex flex-col justify-between hidden md:flex z-30">
-        <div>
-          {/* LOGO HEADER */}
-          <div className="p-6 border-b border-white/10 flex items-center justify-between">
-            <Link href="/dashboard" className="flex items-center gap-3 group">
-              <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-[#c5a059] to-[#8a6e34] p-[1px] flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform">
-                <div className="w-full h-full bg-[#0b0c0e] rounded-[7px] flex items-center justify-center">
-                  <Sparkles className="w-5 h-5 text-[#c5a059]" />
-                </div>
-              </div>
-              <div>
-                <span className="font-serif-luxury text-xl font-bold tracking-tight text-[#f5f4f0] block leading-none">
-                  STUDIO<span className="text-[#c5a059] font-sans text-xs ml-1 font-semibold tracking-widest">AI</span>
-                </span>
-                <span className="text-[10px] text-[#9e9d98] tracking-widest uppercase block mt-1">
-                  Haute Social Engine
-                </span>
-              </div>
-            </Link>
-          </div>
+  const bottomItems = [
+    { name: "Workspace", href: "/settings", icon: Building2 },
+    { name: "Settings", href: "/settings", icon: Settings },
+    { name: "Help", href: "/help", icon: HelpCircle },
+    { name: "Account", href: "/settings/profile", icon: User },
+  ];
 
-          {/* BRAND SELECTOR DROPDOWN */}
-          <div className="px-4 py-4 border-b border-white/5 relative">
-            <label className="text-[10px] uppercase tracking-widest text-[#9e9d98] font-semibold block px-2 mb-1.5">
-              Active Brand Persona
-            </label>
+  const SidebarContent = () => (
+    <div className="h-full flex flex-col justify-between p-4 selection:bg-[#D4AF37]/30 overflow-hidden">
+      <div className="flex-1 flex flex-col min-h-0 space-y-3">
+        {/* LOGO HEADER */}
+        <div className="p-2 border-b border-white/[0.08] flex items-center justify-between shrink-0">
+          <Link href="/dashboard" className="flex items-center gap-3 group">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#D4AF37] via-[#C5A059] to-[#8A6D3B] p-[1px] flex items-center justify-center shadow-md shadow-[#D4AF37]/15">
+              <div className="w-full h-full bg-[#0B0C0E] rounded-[11px] flex items-center justify-center">
+                <Sparkles className="w-4.5 h-4.5 text-[#D4AF37]" />
+              </div>
+            </div>
+            <div>
+              <span className="text-sm font-bold tracking-tight text-[#F5F4F0] block leading-none font-sans">
+                AI SOCIAL MEDIA
+              </span>
+              <span className="text-[#D4AF37] font-semibold text-xs tracking-widest uppercase block mt-0.5 font-sans">
+                STUDIO
+              </span>
+            </div>
+          </Link>
+          {isMobileMenuOpen && (
             <button
-              onClick={() => setShowBrandDropdown(!showBrandDropdown)}
-              className="w-full flex items-center justify-between p-2.5 rounded-lg bg-[#1c1f26] border border-white/10 hover:border-[#c5a059]/40 transition-colors text-left"
+              onClick={() => setIsMobileMenuOpen(false)}
+              className="md:hidden text-[#9E9D98] hover:text-[#F5F4F0] p-1"
             >
-              <div className="flex items-center gap-2.5 truncate">
-                <div
-                  className="w-3.5 h-3.5 rounded-full border border-white/20 flex-shrink-0"
-                  style={{ backgroundColor: activeBrand.accentColor }}
-                />
-                <span className="text-sm font-medium text-[#f5f4f0] truncate">{activeBrand.name}</span>
-              </div>
-              <ChevronDown className="w-4 h-4 text-[#9e9d98]" />
+              <X className="w-5 h-5" />
             </button>
+          )}
+        </div>
 
-            {showBrandDropdown && (
-              <div className="absolute top-full left-4 right-4 mt-2 bg-[#1c1f26] border border-white/10 rounded-xl shadow-2xl z-50 overflow-hidden py-1">
-                {brands.map((brand) => (
-                  <button
-                    key={brand.id}
-                    onClick={() => {
-                      setActiveBrand(brand);
-                      setShowBrandDropdown(false);
-                    }}
-                    className={`w-full flex items-center gap-3 px-3 py-2.5 text-xs text-left hover:bg-white/5 transition-colors ${
-                      brand.id === activeBrand.id ? "bg-[#c5a059]/10 text-[#c5a059] font-medium" : "text-[#f5f4f0]"
-                    }`}
-                  >
-                    <div
-                      className="w-3 h-3 rounded-full border border-white/20"
-                      style={{ backgroundColor: brand.accentColor }}
-                    />
-                    <div className="truncate">
-                      <div className="font-medium">{brand.name}</div>
-                      <div className="text-[10px] text-[#9e9d98] truncate">{brand.toneVoice}</div>
-                    </div>
-                  </button>
-                ))}
-                <Link
-                  href="/brand"
-                  onClick={() => setShowBrandDropdown(false)}
-                  className="w-full flex items-center gap-2 px-3 py-2 text-[11px] text-[#c5a059] border-t border-white/5 hover:bg-[#c5a059]/10 font-medium"
+        {/* WORKSPACE SELECTOR DROPDOWN */}
+        <div className="relative shrink-0">
+          <button
+            onClick={() => setShowWorkspaceDropdown(!showWorkspaceDropdown)}
+            className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl bg-[#151618] border border-white/[0.08] hover:border-[#D4AF37]/40 transition-colors text-left"
+          >
+            <div className="flex items-center gap-2.5 truncate">
+              <Building2 className="w-4 h-4 text-[#D4AF37] shrink-0" />
+              <span className="text-xs font-semibold text-[#F5F4F0] truncate">
+                {activeWorkspace?.name || "My Workspace"}
+              </span>
+            </div>
+            <ChevronDown className="w-3.5 h-3.5 text-[#9E9D98] shrink-0" />
+          </button>
+
+          {showWorkspaceDropdown && (
+            <div className="absolute top-full left-0 right-0 mt-2 bg-[#151618] border border-white/[0.08] rounded-xl shadow-2xl z-50 overflow-hidden py-1">
+              {workspaces.map((ws) => (
+                <button
+                  key={ws.id}
+                  onClick={() => {
+                    setActiveWorkspace(ws);
+                    setShowWorkspaceDropdown(false);
+                    router.refresh();
+                  }}
+                  className={`w-full flex items-center gap-2.5 px-3 py-2 text-xs text-left hover:bg-white/5 transition-colors ${
+                    ws.id === activeWorkspace?.id ? "bg-[#D4AF37]/10 text-[#D4AF37] font-medium" : "text-[#F5F4F0]"
+                  }`}
                 >
-                  <PlusCircle className="w-3.5 h-3.5" />
-                  Configure Brand Identities
-                </Link>
-              </div>
-            )}
-          </div>
+                  <Building2 className="w-3.5 h-3.5 text-[#9E9D98] shrink-0" />
+                  <span className="truncate">{ws.name}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
 
-          {/* MAIN NAV NAVIGATION LINKS */}
-          <nav className="p-3 space-y-1">
-            {navItems.map((item) => {
-              const isActive = pathname === item.href || (item.href !== "/dashboard" && pathname?.startsWith(item.href));
-              const Icon = item.icon;
+        {/* PRIMARY CTA: + CREATE */}
+        <Link
+          href="/create"
+          onClick={() => setIsMobileMenuOpen(false)}
+          className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-[#D4AF37] to-[#C5A059] text-[#0B0C0E] font-semibold text-xs shadow-md shadow-[#D4AF37]/10 hover:opacity-95 transition-all flex items-center justify-center gap-2 shrink-0"
+        >
+          <PlusCircle className="w-4 h-4 text-[#0B0C0E]" />
+          <span>+ Create</span>
+        </Link>
 
-              if (item.isPrimary) {
+        {/* NAVIGATION SECTIONS */}
+        <nav className="flex-1 overflow-y-auto space-y-3 pt-1 pr-1 min-h-0">
+          {navSections.map((section) => (
+            <div key={section.group} className="space-y-0.5">
+              <span className="text-[10px] font-mono font-bold text-[#9E9D98]/70 tracking-widest uppercase block px-3 py-1">
+                {section.group}
+              </span>
+              {section.items.map((item) => {
+                const isActive =
+                  item.href === "/dashboard"
+                    ? pathname === "/dashboard"
+                    : pathname?.startsWith(item.href);
+                const Icon = item.icon;
+
                 return (
                   <Link
                     key={item.name}
                     href={item.href}
-                    className="flex items-center justify-between px-3.5 py-3 rounded-lg bg-gradient-to-r from-[#c5a059] to-[#997734] text-black font-semibold text-sm shadow-lg hover:brightness-110 transition-all my-3 group"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className={`flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-all group ${
+                      isActive
+                        ? "bg-[#D4AF37]/15 text-[#D4AF37] border border-[#D4AF37]/30"
+                        : "text-[#9E9D98] hover:text-[#F5F4F0] hover:bg-white/5"
+                    }`}
                   >
-                    <div className="flex items-center gap-3">
-                      <Icon className="w-4 h-4 text-black group-hover:rotate-45 transition-transform" />
+                    <div className="flex items-center gap-2.5">
+                      <Icon
+                        className={`w-4 h-4 ${
+                          isActive ? "text-[#D4AF37]" : "text-[#9E9D98] group-hover:text-[#F5F4F0]"
+                        }`}
+                      />
                       <span>{item.name}</span>
                     </div>
-                    <span className="text-[10px] uppercase font-bold tracking-widest bg-black/20 px-2 py-0.5 rounded text-black">
-                      1 : N
-                    </span>
                   </Link>
                 );
-              }
-
-              return (
-                <Link
-                  key={item.name}
-                  href={item.href}
-                  className={`flex items-center justify-between px-3.5 py-2.5 rounded-lg text-xs font-medium transition-all group ${
-                    isActive
-                      ? "bg-[#1c1f26] text-[#c5a059] border border-[#c5a059]/30"
-                      : "text-[#9e9d98] hover:text-[#f5f4f0] hover:bg-white/5"
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <Icon className={`w-4 h-4 ${isActive ? "text-[#c5a059]" : "text-[#9e9d98] group-hover:text-[#f5f4f0]"}`} />
-                    <span>{item.name}</span>
-                  </div>
-                  {item.badge && (
-                    <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-[#c5a059]/20 text-[#c5a059] border border-[#c5a059]/30">
-                      {item.badge}
-                    </span>
-                  )}
-                </Link>
-              );
-            })}
-          </nav>
-        </div>
-
-        {/* FOOTER USER METRICS & PROFILE MENU */}
-        <div className="p-4 border-t border-white/10 bg-[#0b0c0e]/50">
-          <div className="p-3 rounded-xl bg-[#1c1f26] border border-white/5 flex items-center justify-between">
-            <div className="flex items-center gap-3 truncate">
-              <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-[#c5a059] to-[#f5f4f0] text-black font-bold flex items-center justify-center text-xs flex-shrink-0">
-                {userProfile?.name ? userProfile.name.charAt(0).toUpperCase() : "CL"}
-              </div>
-              <div className="truncate">
-                <div className="text-xs font-medium text-[#f5f4f0] truncate">{userProfile?.name || "Creative Director"}</div>
-                <div className="text-[10px] text-[#9e9d98] truncate">{userProfile?.email || "director@maisonlumiere.com"}</div>
-              </div>
+              })}
             </div>
-            <button
-              onClick={handleSignOut}
-              className="text-[#9e9d98] hover:text-[#a84b4b] transition-colors p-1"
-              title="Sign Out"
-            >
-              <LogOut className="w-4 h-4" />
-            </button>
-          </div>
+          ))}
+        </nav>
+      </div>
+
+      {/* BOTTOM NAV ITEMS & USER ACCOUNT */}
+      <div className="pt-3 border-t border-white/[0.08] space-y-2">
+        <div className="space-y-0.5">
+          {bottomItems.map((item) => {
+            const isActive = pathname === item.href;
+            const Icon = item.icon;
+            return (
+              <Link
+                key={item.name}
+                href={item.href}
+                onClick={() => setIsMobileMenuOpen(false)}
+                className={`flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                  isActive
+                    ? "bg-[#D4AF37]/15 text-[#D4AF37]"
+                    : "text-[#9E9D98] hover:text-[#F5F4F0] hover:bg-white/5"
+                }`}
+              >
+                <Icon className="w-3.5 h-3.5" />
+                <span>{item.name}</span>
+              </Link>
+            );
+          })}
         </div>
+
+        {/* ACCOUNT ITEM FOOTER */}
+        <div className="pt-2 border-t border-white/[0.08] flex items-center justify-between px-2">
+          <div className="flex items-center gap-2.5 truncate">
+            <div className="w-7 h-7 rounded-lg bg-[#D4AF37]/20 border border-[#D4AF37]/40 text-[#D4AF37] font-bold flex items-center justify-center text-xs shrink-0">
+              {userProfile?.name ? userProfile.name.charAt(0).toUpperCase() : "A"}
+            </div>
+            <div className="truncate">
+              <div className="text-xs font-medium text-[#F5F4F0] truncate">
+                {userProfile?.name || "Alex"}
+              </div>
+              <div className="text-[10px] text-[#9E9D98] truncate">{userProfile?.email}</div>
+            </div>
+          </div>
+          <button
+            onClick={handleSignOut}
+            className="text-[#9E9D98] hover:text-red-400 transition-colors p-1"
+            title="Sign Out"
+          >
+            <LogOut className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="flex min-h-screen bg-[#0B0C0E] text-[#F5F4F0] selection:bg-[#D4AF37]/30">
+      {/* GLOBAL SEARCH MODAL */}
+      <GlobalSearchModal isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
+
+      {/* DESKTOP PERSISTENT SIDEBAR */}
+      <aside className="w-64 shrink-0 border-r border-white/[0.08] bg-[#151618] flex flex-col justify-between hidden md:flex z-30 h-screen sticky top-0">
+        <SidebarContent />
       </aside>
 
-      {/* RIGHT MAIN CONTENT AREA */}
+      {/* MOBILE DRAWER OVERLAY */}
+      {isMobileMenuOpen && (
+        <div className="fixed inset-0 z-50 md:hidden flex">
+          <div
+            className="fixed inset-0 bg-black/80 backdrop-blur-sm"
+            onClick={() => setIsMobileMenuOpen(false)}
+          />
+          <div className="relative w-72 bg-[#151618] border-r border-white/[0.08] h-full z-10">
+            <SidebarContent />
+          </div>
+        </div>
+      )}
+
+      {/* MAIN CONTENT CONTAINER */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* TOP HEADER */}
-        <header className="h-16 border-b border-white/10 bg-[#14161a]/60 backdrop-blur-md px-6 flex items-center justify-between sticky top-0 z-20">
-          <div className="flex items-center gap-4">
-            <div className="relative hidden sm:block w-72">
-              <Search className="w-4 h-4 text-[#9e9d98] absolute left-3 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                placeholder="Search campaigns, assets, prompts..."
-                className="w-full bg-[#1c1f26] border border-white/10 text-xs text-[#f5f4f0] placeholder-[#6b6a65] rounded-full pl-9 pr-4 py-2 focus:outline-none focus:border-[#c5a059]/50 transition-colors"
-              />
-            </div>
+        <header className="h-16 border-b border-white/[0.08] bg-[#151618]/80 backdrop-blur-md px-4 sm:px-8 flex items-center justify-between sticky top-0 z-20">
+          <div className="flex items-center gap-3">
+            {/* MOBILE HAMBURGER TOGGLE */}
+            <button
+              onClick={() => setIsMobileMenuOpen(true)}
+              className="md:hidden text-[#9E9D98] hover:text-[#F5F4F0] p-1.5 rounded-lg border border-white/[0.08]"
+              aria-label="Open navigation menu"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+
+            {/* SEARCH BUTTON */}
+            <button
+              onClick={() => setIsSearchOpen(true)}
+              className="w-48 sm:w-64 bg-[#0B0C0E] border border-white/[0.08] text-xs text-[#9E9D98] rounded-xl pl-9 pr-3 py-2 flex items-center justify-between hover:border-[#D4AF37]/40 transition-colors text-left relative"
+            >
+              <Search className="w-4 h-4 text-[#9E9D98] absolute left-3 top-1/2 -translate-y-1/2" />
+              <span>Search Studio...</span>
+              <kbd className="hidden sm:inline-block px-1.5 py-0.5 text-[10px] bg-white/10 rounded font-mono text-[#9E9D98]">
+                ⌘K
+              </kbd>
+            </button>
           </div>
 
-          <div className="flex items-center gap-4">
-            {/* LIVE USAGE / SUBSCRIPTION BADGE */}
-            <Link href="/settings" className="no-underline">
-              {billingInfo?.plan && billingInfo.plan !== "FREE" && billingInfo.status === "ACTIVE" ? (
-                <span className="px-3 py-1 rounded-full bg-[#4e8765]/20 border border-[#4e8765]/40 text-[#4e8765] text-xs font-bold flex items-center gap-1.5 hover:bg-[#4e8765]/30 transition-colors">
-                  <Check className="w-3.5 h-3.5" /> {billingInfo.plan} ✓
-                </span>
-              ) : (
-                <span className="px-3 py-1 rounded-full bg-[#c5a059]/15 border border-[#c5a059]/40 text-[#c5a059] text-xs font-bold flex items-center gap-1.5 hover:bg-[#c5a059]/25 transition-colors">
-                  <Zap className="w-3.5 h-3.5" />
-                  <span>{billingInfo?.workflowsRemaining ?? 3} Free Uses</span>
-                </span>
-              )}
-            </Link>
-
-            <Link
-              href="/"
-              className="text-xs text-[#9e9d98] hover:text-[#c5a059] font-medium transition-colors hidden md:block"
-            >
-              Marketing Website ↗
-            </Link>
-
+          <div className="flex items-center gap-3">
             {/* NOTIFICATION BELL */}
             <div className="relative">
               <button
-                onClick={() => {
-                  setShowNotifDropdown(!showNotifDropdown);
-                  if (unreadNotifsCount > 0) markNotificationsRead();
-                }}
-                className="relative p-2 rounded-full hover:bg-white/5 text-[#9e9d98] hover:text-[#f5f4f0] transition-colors"
+                onClick={() => setShowNotifDropdown(!showNotifDropdown)}
+                className="p-2 rounded-xl bg-[#0B0C0E] border border-white/[0.08] hover:border-[#D4AF37]/40 text-[#F5F4F0] transition-colors relative"
+                aria-label="Notifications"
               >
-                <Bell className="w-5 h-5" />
+                <Bell className="w-4 h-4 text-[#9E9D98]" />
                 {unreadNotifsCount > 0 && (
-                  <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-[#c5a059] animate-pulse" />
+                  <span className="absolute -top-1 -right-1 w-4 h-4 bg-[#D4AF37] text-[#0B0C0E] font-bold text-[9px] rounded-full flex items-center justify-center">
+                    {unreadNotifsCount}
+                  </span>
                 )}
               </button>
 
               {showNotifDropdown && (
-                <div className="absolute right-0 mt-3 w-80 bg-[#1c1f26] border border-white/10 rounded-xl shadow-2xl py-2 z-50">
-                  <div className="px-4 py-2 border-b border-white/5 flex items-center justify-between">
-                    <span className="text-xs font-semibold text-[#f5f4f0]">Activity Stream</span>
-                    <span className="text-[10px] text-[#c5a059]">Real-time SSE Queue</span>
+                <div className="absolute right-0 mt-2 w-80 bg-[#151618] border border-white/[0.08] rounded-2xl shadow-2xl z-50 p-4 space-y-3">
+                  <div className="flex items-center justify-between border-b border-white/[0.08] pb-2">
+                    <span className="text-xs font-bold text-[#F5F4F0]">Notifications</span>
+                    {unreadNotifsCount > 0 && (
+                      <button
+                        onClick={markNotificationsRead}
+                        className="text-[10px] text-[#D4AF37] hover:underline font-mono"
+                      >
+                        Mark all read
+                      </button>
+                    )}
                   </div>
-                  <div className="max-h-64 overflow-y-auto divide-y divide-white/5">
-                    {notifications.map((n) => (
-                      <div key={n.id} className="p-3 text-xs hover:bg-white/5 transition-colors">
-                        <div className="font-medium text-[#f5f4f0]">{n.title}</div>
-                        <div className="text-[10px] text-[#9e9d98] mt-1">{n.time}</div>
+                  <div className="space-y-2 max-h-60 overflow-y-auto">
+                    {notifications.length > 0 ? (
+                      notifications.map((n) => (
+                        <div
+                          key={n.id}
+                          className={`p-2.5 rounded-xl text-xs space-y-1 ${
+                            n.read
+                              ? "bg-white/5 opacity-60"
+                              : "bg-[#D4AF37]/10 border border-[#D4AF37]/30"
+                          }`}
+                        >
+                          <div className="font-medium text-[#F5F4F0]">{n.title}</div>
+                          <div className="text-[10px] text-[#9E9D98] font-mono">{n.time}</div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="text-xs text-[#9E9D98] text-center py-4">
+                        No notifications
                       </div>
-                    ))}
+                    )}
                   </div>
                 </div>
               )}
             </div>
 
-            {/* QUICK ACTIONS */}
-            <Link
-              href="/create"
-              className="hidden sm:flex items-center gap-2 px-4 py-2 rounded-full bg-[#1c1f26] border border-[#c5a059]/40 text-[#c5a059] text-xs font-semibold hover:bg-[#c5a059] hover:text-black transition-all"
-            >
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>New Studio Campaign</span>
-            </Link>
+            {/* USER PROFILE DROPDOWN */}
+            <div className="relative">
+              <button
+                onClick={() => setShowUserDropdown(!showUserDropdown)}
+                className="flex items-center gap-2 p-1.5 rounded-xl bg-[#0B0C0E] border border-white/[0.08] hover:border-[#D4AF37]/40 transition-colors"
+              >
+                <div className="w-6 h-6 rounded-lg bg-[#D4AF37]/20 border border-[#D4AF37]/40 text-[#D4AF37] font-bold flex items-center justify-center text-xs shrink-0">
+                  {userProfile?.name ? userProfile.name.charAt(0).toUpperCase() : "A"}
+                </div>
+                <span className="text-xs font-medium text-[#F5F4F0] hidden sm:inline-block">
+                  {userProfile?.name || "Alex"}
+                </span>
+                <ChevronDown className="w-3 h-3 text-[#9E9D98]" />
+              </button>
+
+              {showUserDropdown && (
+                <div className="absolute right-0 mt-2 w-48 bg-[#151618] border border-white/[0.08] rounded-xl shadow-2xl z-50 overflow-hidden py-1">
+                  <div className="px-3 py-2 border-b border-white/[0.08]">
+                    <div className="text-xs font-bold text-[#F5F4F0]">{userProfile?.name}</div>
+                    <div className="text-[10px] text-[#9E9D98] truncate">{userProfile?.email}</div>
+                  </div>
+                  <Link
+                    href="/settings/profile"
+                    onClick={() => setShowUserDropdown(false)}
+                    className="block px-3 py-2 text-xs text-[#9E9D98] hover:text-[#F5F4F0] hover:bg-white/5"
+                  >
+                    Account Profile
+                  </Link>
+                  <Link
+                    href="/settings"
+                    onClick={() => setShowUserDropdown(false)}
+                    className="block px-3 py-2 text-xs text-[#9E9D98] hover:text-[#F5F4F0] hover:bg-white/5"
+                  >
+                    Workspace Settings
+                  </Link>
+                  <button
+                    onClick={handleSignOut}
+                    className="w-full text-left px-3 py-2 text-xs text-red-400 hover:bg-red-500/10 border-t border-white/[0.08]"
+                  >
+                    Sign Out
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </header>
 
-        {/* PAGE CONTENT WRAPPER */}
-        <main className="flex-1 p-6 md:p-10 max-w-7xl w-full mx-auto">{children}</main>
+        {/* MAIN BODY AREA */}
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6 md:p-8">{children}</main>
       </div>
     </div>
   );
 }
+

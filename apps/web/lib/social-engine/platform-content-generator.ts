@@ -9,7 +9,7 @@ import { validatePlatformContent } from "./content-validator";
 export function generatePlatformContent(
   input: GeneratePlatformContentInput
 ): Partial<PlatformContentData> & { validation?: ReturnType<typeof validatePlatformContent> } {
-  const { platform, contentType, sourceData, brand, assetUrl } = input;
+  const { platform, contentType, mode, sourceData, brand, assetUrl } = input;
   const brandName = brand?.name || "Our Brand";
 
   let caption = "";
@@ -20,7 +20,7 @@ export function generatePlatformContent(
   let cta = brand?.defaultCta || "Learn more";
   let altText = "";
   let destinationUrl = "";
-  let platformMetadata: Record<string, unknown> = {};
+  let platformMetadata: Record<string, unknown> = mode ? { contentMode: mode } : {};
 
   // Extract source data components safely
   const aff = sourceData?.affiliate;

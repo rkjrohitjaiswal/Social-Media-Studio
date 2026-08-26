@@ -1,27 +1,85 @@
 import prisma from "@ai-social/database";
-import { FREE_CREDITS_DEFAULT } from "../config/billing.js";
 import { getUserPlan, getPlanEntitlements } from "./entitlement-service.js";
 
 export interface StoredUserUsage {
   userId: string;
+  workspaceId?: string;
   freeCreditsTotal: number;
   freeCreditsUsed: number;
   createdAt: Date;
   updatedAt: Date;
 }
 
-// In-Memory Usage Store for Mock/Test & Authoritative PostgreSQL Cache
+// In-Memory Stores for Test / Fallback & Authoritative Locks
 const usageMemoryStore = new Map<string, StoredUserUsage>();
+const consumedScheduledPosts = new Set<string>();
+const userLocks = new Map<string, Promise<void>>();
 
-export async function getUserUsage(userId: string): Promise<{
+export function clearInMemoryUsage(): void {
+  usageMemoryStore.clear();
+  consumedScheduledPosts.clear();
+  userLocks.clear();
+}
+
+/**
+ * Ensures mutual exclusion for a specific identifier (userId or workspaceId)
+ * to prevent concurrent race conditions during credit consumption.
+ */
+async function withLock<T>(key: string, fn: () => Promise<T>): Promise<T> {
+  const currentLock = userLocks.get(key) || Promise.resolve();
+  let release: () => void;
+  const nextLock = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+
+  userLocks.set(key, currentLock.then(() => nextLock));
+
+  try {
+    await currentLock;
+    return await fn();
+  } finally {
+    release!();
+    if (userLocks.get(key) === currentLock.then(() => nextLock)) {
+      userLocks.delete(key);
+    }
+  }
+}
+
+/**
+ * Resolves the primary userId for a given workspaceId or returns the provided userId.
+ */
+export async function resolveUserIdForWorkspace(userId?: string, workspaceId?: string): Promise<string> {
+  if (userId) return userId;
+
+  if (workspaceId) {
+    try {
+      const ws = await prisma.workspace.findUnique({
+        where: { id: workspaceId },
+        select: { ownerId: true },
+      });
+      if (ws?.ownerId) return ws.ownerId;
+    } catch {
+      // Fallback
+    }
+    return `ws_user_${workspaceId}`;
+  }
+
+  return "demo-user-1";
+}
+
+/**
+ * Retrieves the current usage summary for a user or workspace.
+ */
+export async function getUserUsage(userIdOrWorkspaceId: string): Promise<{
   freeCreditsTotal: number;
   freeCreditsUsed: number;
   freeCreditsRemaining: number;
 }> {
-  if (!userId) {
-    throw new Error("User ID is required to fetch usage");
+  if (!userIdOrWorkspaceId) {
+    throw new Error("User ID or Workspace ID is required to fetch usage");
   }
 
+  const userId = userIdOrWorkspaceId;
   const plan = await getUserPlan(userId);
   const entitlements = getPlanEntitlements(plan);
 
@@ -70,9 +128,12 @@ export async function getUserUsage(userId: string): Promise<{
   };
 }
 
+/**
+ * Checks whether a user/workspace has sufficient available credits.
+ */
 export async function checkUsageAccess(
-  userId: string,
-  action: "CONTENT_GENERATION" = "CONTENT_GENERATION"
+  userIdOrWorkspaceId: string,
+  action: "CONTENT_GENERATION" | "PUBLISHING" = "CONTENT_GENERATION"
 ): Promise<{
   allowed: boolean;
   code?: string;
@@ -80,6 +141,7 @@ export async function checkUsageAccess(
   freeCreditsRemaining: number;
   isPro: boolean;
 }> {
+  const userId = userIdOrWorkspaceId;
   const plan = await getUserPlan(userId);
   const usage = await getUserUsage(userId);
   const isPaid = plan !== "FREE";
@@ -96,7 +158,7 @@ export async function checkUsageAccess(
     return {
       allowed: false,
       code: "PLAN_LIMIT_REACHED",
-      message: "Your 3 free workflows are exhausted. Please upgrade your plan to continue.",
+      message: "Your free credits are exhausted. Please upgrade your plan to continue.",
       freeCreditsRemaining: 0,
       isPro: false,
     };
@@ -105,69 +167,99 @@ export async function checkUsageAccess(
   return {
     allowed: false,
     code: "USAGE_LIMIT_REACHED",
-    message: `You have reached your monthly limit of ${usage.freeCreditsTotal} workflows for the ${plan} plan. Upgrade to a higher tier to continue.`,
+    message: `You have reached your monthly limit of ${usage.freeCreditsTotal} credits for the ${plan} plan. Upgrade to a higher tier to continue.`,
     freeCreditsRemaining: 0,
     isPro: true,
   };
 }
 
+/**
+ * Consumes credits atomically with lock protection against double-charges or negative balances.
+ */
 export async function consumeUsage(
-  userId: string,
-  action: "CONTENT_GENERATION" = "CONTENT_GENERATION"
+  userIdOrWorkspaceId: string,
+  action: "CONTENT_GENERATION" | "PUBLISHING" = "CONTENT_GENERATION",
+  cost: number = 1
 ): Promise<{ freeCreditsTotal: number; freeCreditsUsed: number; freeCreditsRemaining: number }> {
-  const plan = await getUserPlan(userId);
-  const access = await checkUsageAccess(userId, action);
+  return withLock(userIdOrWorkspaceId, async () => {
+    const userId = userIdOrWorkspaceId;
+    const plan = await getUserPlan(userId);
+    const access = await checkUsageAccess(userId, action);
 
-  if (!access.allowed) {
-    if (plan === "FREE") {
-      throw new Error("PLAN_LIMIT_REACHED: Your 3 free workflows are exhausted. Please upgrade your plan to continue.");
-    } else {
-      throw new Error(`USAGE_LIMIT_REACHED: You have reached your monthly workflow limit for the ${plan} plan.`);
+    if (!access.allowed) {
+      const err = new Error(
+        access.code === "PLAN_LIMIT_REACHED"
+          ? "PLAN_LIMIT_REACHED: Your free credits are exhausted. Please upgrade your plan to continue."
+          : `USAGE_LIMIT_REACHED: You have reached your monthly credit limit for the ${plan} plan.`
+      );
+      (err as any).statusCode = 402;
+      throw err;
     }
+
+    const currentUsage = await getUserUsage(userId);
+    const updatedUsed = currentUsage.freeCreditsUsed + cost;
+    const now = new Date();
+
+    const record: StoredUserUsage = {
+      userId,
+      freeCreditsTotal: currentUsage.freeCreditsTotal,
+      freeCreditsUsed: updatedUsed,
+      createdAt: new Date(),
+      updatedAt: now,
+    };
+
+    usageMemoryStore.set(userId, record);
+
+    try {
+      await prisma.userUsage.upsert({
+        where: { userId },
+        update: {
+          freeCreditsUsed: updatedUsed,
+          updatedAt: now,
+        },
+        create: {
+          userId,
+          freeCreditsTotal: currentUsage.freeCreditsTotal,
+          freeCreditsUsed: updatedUsed,
+        },
+      });
+    } catch {
+      // DB offline in mock test mode
+    }
+
+    return {
+      freeCreditsTotal: currentUsage.freeCreditsTotal,
+      freeCreditsUsed: updatedUsed,
+      freeCreditsRemaining: Math.max(0, currentUsage.freeCreditsTotal - updatedUsed),
+    };
+  });
+}
+
+/**
+ * Consumes 1 credit specifically for successful publishing execution.
+ * Idempotent per scheduledPostId: guarantees a post is never charged twice on retries.
+ */
+export async function consumePublishingCredit(params: {
+  userId?: string;
+  workspaceId?: string;
+  scheduledPostId?: string;
+}): Promise<{ consumed: boolean; freeCreditsRemaining?: number }> {
+  const { userId, workspaceId, scheduledPostId } = params;
+
+  if (scheduledPostId && consumedScheduledPosts.has(scheduledPostId)) {
+    return { consumed: false };
   }
 
-  const currentUsage = await getUserUsage(userId);
-  const updatedUsed = currentUsage.freeCreditsUsed + 1;
-  const now = new Date();
+  const targetId = await resolveUserIdForWorkspace(userId, workspaceId);
+  const result = await consumeUsage(targetId, "PUBLISHING", 1);
 
-  const record: StoredUserUsage = {
-    userId,
-    freeCreditsTotal: currentUsage.freeCreditsTotal,
-    freeCreditsUsed: updatedUsed,
-    createdAt: new Date(),
-    updatedAt: now,
-  };
-
-  usageMemoryStore.set(userId, record);
-
-  try {
-    await prisma.userUsage.upsert({
-      where: { userId },
-      update: {
-        freeCreditsUsed: updatedUsed,
-        updatedAt: now,
-      },
-      create: {
-        userId,
-        freeCreditsTotal: currentUsage.freeCreditsTotal,
-        freeCreditsUsed: updatedUsed,
-      },
-    });
-  } catch {
-    // DB offline in mock test mode
+  if (scheduledPostId) {
+    consumedScheduledPosts.add(scheduledPostId);
   }
 
-  return {
-    freeCreditsTotal: currentUsage.freeCreditsTotal,
-    freeCreditsUsed: updatedUsed,
-    freeCreditsRemaining: Math.max(0, currentUsage.freeCreditsTotal - updatedUsed),
-  };
+  return { consumed: true, freeCreditsRemaining: result.freeCreditsRemaining };
 }
 
 export async function consumeWorkflowCredit(userId: string) {
   return consumeUsage(userId, "CONTENT_GENERATION");
-}
-
-export function clearInMemoryUsage(): void {
-  usageMemoryStore.clear();
 }

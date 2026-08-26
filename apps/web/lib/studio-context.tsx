@@ -1,6 +1,6 @@
-"use client";
-
-import React, { createContext, useContext, useState } from "react";
+import React, { createContext, useContext, useState, useEffect } from "react";
+import { WorkspaceResponse } from "@ai-social/shared";
+import { getWorkspaces } from "./api-client";
 import {
   Brand,
   Campaign,
@@ -41,6 +41,10 @@ interface StudioContextType {
   scheduleAssetToInstagram: (assetId: string, dateIso: string) => void;
   notifications: { id: string; title: string; time: string; read: boolean }[];
   markNotificationsRead: () => void;
+  workspaces: WorkspaceResponse[];
+  activeWorkspace: WorkspaceResponse | null;
+  setActiveWorkspace: (ws: WorkspaceResponse) => void;
+  loadWorkspaces: () => Promise<void>;
 }
 
 const StudioContext = createContext<StudioContextType | undefined>(undefined);
@@ -51,6 +55,69 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
   const [campaigns, setCampaigns] = useState<Campaign[]>(MOCK_CAMPAIGNS);
   const [activeCampaignId, setActiveCampaignId] = useState<string>("camp-101");
   const [scheduledPosts, setScheduledPosts] = useState<ScheduledPost[]>(MOCK_SCHEDULED_POSTS);
+
+  const [workspaces, setWorkspaces] = useState<WorkspaceResponse[]>([
+    {
+      id: "demo-workspace-1",
+      name: "Maison Lumière Studio",
+      slug: "demo-workspace-1",
+      ownerId: "demo-user-id",
+      plan: "BUSINESS",
+      members: [],
+      invitations: [],
+      createdAt: new Date().toISOString(),
+    },
+  ]);
+  const [activeWorkspace, setActiveWorkspaceState] = useState<WorkspaceResponse | null>(null);
+
+  const loadWorkspaces = async () => {
+    try {
+      const fetched = await getWorkspaces();
+      if (fetched && fetched.length > 0) {
+        setWorkspaces(fetched);
+        const storedId = typeof window !== "undefined" ? localStorage.getItem("activeWorkspaceId") : null;
+        const matched = fetched.find((w) => w.id === storedId) || fetched[0];
+        setActiveWorkspaceState(matched);
+        if (typeof window !== "undefined") {
+          localStorage.setItem("activeWorkspaceId", matched.id);
+        }
+      }
+    } catch {
+      // Fallback
+    }
+  };
+
+  useEffect(() => {
+    let isSubscribed = true;
+    async function initWorkspaces() {
+      try {
+        const fetched = await getWorkspaces();
+        if (isSubscribed && fetched && fetched.length > 0) {
+          setWorkspaces(fetched);
+          const storedId = typeof window !== "undefined" ? localStorage.getItem("activeWorkspaceId") : null;
+          const matched = fetched.find((w) => w.id === storedId) || fetched[0];
+          setActiveWorkspaceState(matched);
+          if (typeof window !== "undefined") {
+            localStorage.setItem("activeWorkspaceId", matched.id);
+          }
+        }
+      } catch {
+        // Fallback
+      }
+    }
+    initWorkspaces();
+    return () => {
+      isSubscribed = false;
+    };
+  }, []);
+
+  const setActiveWorkspace = (ws: WorkspaceResponse) => {
+    setActiveWorkspaceState(ws);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("activeWorkspaceId", ws.id);
+    }
+  };
+
   const [notifications, setNotifications] = useState([
     {
       id: "n-1",
@@ -330,6 +397,10 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
         scheduleAssetToInstagram,
         notifications,
         markNotificationsRead,
+        workspaces,
+        activeWorkspace,
+        setActiveWorkspace,
+        loadWorkspaces,
       }}
     >
       {children}

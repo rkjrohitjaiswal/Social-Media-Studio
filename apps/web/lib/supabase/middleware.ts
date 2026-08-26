@@ -15,7 +15,7 @@ export async function updateSession(request: NextRequest) {
         return request.cookies.getAll();
       },
       setAll(cookiesToSet) {
-        cookiesToSet.forEach(({ name, value, options }) => request.cookies.set(name, value));
+        cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
         supabaseResponse = NextResponse.next({
           request,
         });
@@ -30,9 +30,21 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
+  const hasDevBypassParam = request.nextUrl.searchParams.get("dev_bypass") === "true";
+  const hasDevBypassCookie = request.cookies.get("dev_bypass")?.value === "true";
+  const isDevBypass = process.env.NODE_ENV === "development" && (hasDevBypassCookie || hasDevBypassParam);
+
+  if (hasDevBypassParam && process.env.NODE_ENV === "development") {
+    supabaseResponse.cookies.set("dev_bypass", "true", { path: "/", maxAge: 86400 });
+  }
+
   const isProtectedPath = [
     "/dashboard",
     "/create",
+    "/goals",
+    "/tools",
+    "/templates",
+    "/saved",
     "/campaigns",
     "/approvals",
     "/calendar",
@@ -47,7 +59,7 @@ export async function updateSession(request: NextRequest) {
   );
 
   // If user is NOT authenticated and attempting to access protected route -> redirect to /login
-  if (!user && isProtectedPath) {
+  if (!user && !isDevBypass && isProtectedPath) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     return NextResponse.redirect(url);

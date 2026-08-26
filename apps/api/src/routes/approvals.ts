@@ -4,11 +4,36 @@ import {
   createApprovalRequest,
   reviewApprovalRequest,
   getApprovalById,
+  listApprovalRequests,
 } from "../services/approval-service.js";
 import { createApprovalRequestSchema, reviewActionSchema } from "@ai-social/shared";
 import { canUseFeature } from "../services/entitlement-service.js";
 
 export const approvalsRouter = Router();
+
+// GET /api/approvals -> Fetch approval requests for active workspace
+approvalsRouter.get("/", requireAuth as any, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const workspaceId = req.workspaceId || "demo-workspace-1";
+    const approvals = await listApprovalRequests(workspaceId);
+    return res.json({ success: true, data: approvals });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "Failed to fetch approvals";
+    return res.status(500).json({ error: msg });
+  }
+});
+
+// GET /api/workspaces/:id/approvals -> Fetch approval requests for workspace
+approvalsRouter.get("/:id/approvals", requireAuth as any, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const workspaceId = req.params.id;
+    const approvals = await listApprovalRequests(workspaceId);
+    return res.json({ success: true, data: approvals });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "Failed to fetch approvals";
+    return res.status(500).json({ error: msg });
+  }
+});
 
 // POST /api/workspaces/:id/approvals -> Create content approval request
 approvalsRouter.post("/:id/approvals", requireAuth as any, async (req: AuthenticatedRequest, res: Response) => {

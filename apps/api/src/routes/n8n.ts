@@ -1,8 +1,33 @@
-import { Router, Response } from "express";
+import { Router, Request, Response } from "express";
 import { AuthenticatedRequest, requireAuth } from "../middleware/auth.js";
+import { processInboundN8nCallback } from "../services/n8n-inbound-service.js";
 
 export const n8nRouter = Router();
 
+// ── Inbound Webhook Callback (Authenticates via HMAC X-Studio-Signature, NO user JWT) ──
+n8nRouter.post("/webhook-callback", async (req: Request, res: Response) => {
+  try {
+    const signatureHeader = (req.headers["x-studio-signature"] || req.headers["x-hub-signature-256"]) as string;
+
+    const rawBodyStr = typeof (req as any).rawBody === "string"
+      ? (req as any).rawBody
+      : JSON.stringify(req.body || {});
+
+    const result = await processInboundN8nCallback(req.body, rawBodyStr, signatureHeader);
+
+    return res.status(result.status).json({
+      success: result.success,
+      ...(result.message ? { message: result.message } : {}),
+      ...(result.error ? { error: result.error } : {}),
+      ...(result.eventId ? { eventId: result.eventId } : {}),
+    });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return res.status(500).json({ success: false, error: `Inbound webhook error: ${msg}` });
+  }
+});
+
+// ── All remaining user-facing integrations endpoints require user JWT ──
 n8nRouter.use(requireAuth as any);
 
 const mockIntegrations: any[] = [

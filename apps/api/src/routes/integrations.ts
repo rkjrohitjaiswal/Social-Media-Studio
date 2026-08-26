@@ -1,8 +1,26 @@
 import { Router, Response } from "express";
 import { AuthenticatedRequest, requireAuth } from "../middleware/auth.js";
 import { generateSignedOAuthState, verifyOAuthState } from "../utils/encryption.js";
+import {
+  listWorkspaceSocialAccounts,
+  getWorkspaceSocialAccountById,
+  connectSocialAccount,
+  disconnectSocialAccount,
+  disconnectPlatformAccounts,
+} from "../services/social-account-service.js";
+import { getAllProvidersConfigStatus } from "../config/provider-config.js";
 
 export const integrationsRouter = Router();
+
+// GET /api/integrations/providers/status -> Provider readiness status (no secrets exposed)
+integrationsRouter.get("/providers/status", requireAuth as any, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const statuses = getAllProvidersConfigStatus();
+    return res.json({ success: true, data: statuses });
+  } catch (err: any) {
+    return res.status(500).json({ error: "Failed to retrieve provider configuration status" });
+  }
+});
 
 // Helper to construct OAuth callback URL dynamically or from env
 function getCallbackUrl(platform: string): string {
@@ -10,16 +28,91 @@ function getCallbackUrl(platform: string): string {
   return `${apiBase}/api/integrations/${platform}/callback`;
 }
 
+// GET /api/integrations/accounts -> List all DB-backed connected accounts for active workspace
+integrationsRouter.get("/accounts", requireAuth as any, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const workspaceId = req.workspaceId || "demo-workspace-1";
+    const accounts = await listWorkspaceSocialAccounts(workspaceId);
+    return res.json({ success: true, data: accounts });
+  } catch (err: any) {
+    return res.status(500).json({ error: "Failed to list social accounts" });
+  }
+});
+
+// GET /api/integrations/accounts/:id -> Get specific account by ID for active workspace
+integrationsRouter.get("/accounts/:id", requireAuth as any, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const workspaceId = req.workspaceId || "demo-workspace-1";
+    const account = await getWorkspaceSocialAccountById(req.params.id, workspaceId);
+    if (!account) {
+      return res.status(404).json({ error: "Social account not found or access denied" });
+    }
+    return res.json({ success: true, data: account });
+  } catch (err: any) {
+    return res.status(500).json({ error: "Failed to retrieve social account" });
+  }
+});
+
+// POST /api/integrations/connect -> Connect / Store social account metadata in DB
+integrationsRouter.post("/connect", requireAuth as any, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const workspaceId = req.workspaceId || "demo-workspace-1";
+    const userId = req.user!.id;
+    const { platform, externalAccountId, username, displayName, profileImageUrl, accountType, accessToken, refreshToken } = req.body;
+
+    if (!platform || !externalAccountId) {
+      return res.status(400).json({ error: "platform and externalAccountId are required" });
+    }
+
+    const connected = await connectSocialAccount({
+      workspaceId,
+      userId,
+      platform,
+      externalAccountId,
+      username,
+      displayName,
+      profileImageUrl,
+      accountType,
+      accessToken,
+      refreshToken,
+    });
+
+    return res.status(201).json({ success: true, data: connected });
+  } catch (err: any) {
+    return res.status(500).json({ error: "Failed to connect social account" });
+  }
+});
+
+// POST /api/integrations/disconnect/:id -> Disconnect specific social account
+integrationsRouter.post("/disconnect/:id", requireAuth as any, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const workspaceId = req.workspaceId || "demo-workspace-1";
+    const result = await disconnectSocialAccount(req.params.id, workspaceId);
+    if (!result.success) {
+      return res.status(404).json({ error: result.message });
+    }
+    return res.json({ success: true, message: result.message });
+  } catch (err: any) {
+    return res.status(500).json({ error: "Failed to disconnect social account" });
+  }
+});
+
 // Instagram
-integrationsRouter.get("/instagram", requireAuth as any, (req: AuthenticatedRequest, res: Response) => {
-  res.json({
-    connected: true,
-    account: {
-      username: "maisonlumiere",
-      accountType: "PROFESSIONAL",
-      status: "CONNECTED",
-      connectedAt: new Date().toISOString(),
-    },
+integrationsRouter.get("/instagram", requireAuth as any, async (req: AuthenticatedRequest, res: Response) => {
+  const workspaceId = req.workspaceId || "demo-workspace-1";
+  const accounts = await listWorkspaceSocialAccounts(workspaceId);
+  const ig = accounts.find((a) => a.platform === "INSTAGRAM");
+
+  if (ig) {
+    return res.json({
+      connected: true,
+      account: ig,
+    });
+  }
+
+  return res.json({
+    connected: false,
+    account: null,
   });
 });
 

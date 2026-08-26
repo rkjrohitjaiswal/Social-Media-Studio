@@ -10,3 +10,18 @@ export * from "./schemas/brand-profile";
 export * from "./schemas/repurposing";
 export * from "./schemas/workspace";
 export * from "./schemas/approval";
+export * from "./schemas/goals";
+export * from "./schemas/tools";
+export * from "./schemas/templates";
+export * from "./schemas/saved";
+export * from "./schemas/strategy";
+export * from "./schemas/campaign-planner";
+export * from "./schemas/performance";
+export * from "./schemas/trends";
+export * from "./schemas/creative-generation";
+export * from "./schemas/video-composition";
+export * from "./schemas/video-script";
+export * from "./schemas/repurposing-package";
+export * from "./schemas/content-project";
+export * from "./schemas/video-generation";
+

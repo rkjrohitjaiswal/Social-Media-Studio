@@ -39,3 +39,6 @@ Thumbs.db
 *.db
 *.sqlite
 *.sqlite3
+ai-social-media-studio*.json
+*-*.json
+

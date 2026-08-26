@@ -29,9 +29,11 @@ export class ProviderError extends Error {
 }
 
 export interface GenerationParams {
-  referenceImageBytes: Buffer;
-  inputImageBytes: Buffer;
   prompt: string;
+  referenceImageBytes?: Buffer;
+  inputImageBytes?: Buffer;
+  inputImageUrls?: string[];
+  referenceImageUrl?: string;
   quality?: string;
   size?: string;
   outputFormat?: string;

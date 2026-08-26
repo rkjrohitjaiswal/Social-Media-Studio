@@ -188,3 +188,152 @@ export async function getUserOpenAIApiKey(userId?: string): Promise<string> {
 export function clearInMemoryUserCredentials(): void {
   memoryStore.clear();
 }
+
+export interface ProviderConfigStatus {
+  providerName: string;
+  category: "AI_TEXT" | "AI_IMAGE" | "AI_VIDEO" | "AI_VOICE" | "SOCIAL_PLATFORM" | "AUTOMATION" | "DATABASE" | "STORAGE" | "ENCRYPTION";
+  status: "CONFIGURED" | "CONFIGURATION_REQUIRED" | "MOCK_ONLY" | "ERROR";
+  isConfigured: boolean;
+  requiredEnvVars: string[];
+  fallbackMode: string;
+}
+
+export async function getProviderConfigStatus(userId?: string): Promise<ProviderConfigStatus[]> {
+  const env = process.env;
+
+  const getStatus = (isConfig: boolean, isMockFallback = true): "CONFIGURED" | "CONFIGURATION_REQUIRED" | "MOCK_ONLY" => {
+    if (isConfig) return "CONFIGURED";
+    return isMockFallback ? "MOCK_ONLY" : "CONFIGURATION_REQUIRED";
+  };
+
+  return [
+    {
+      providerName: "OPENAI",
+      category: "AI_TEXT",
+      status: getStatus(Boolean(env.OPENAI_API_KEY && !env.OPENAI_API_KEY.includes("your-"))),
+      isConfigured: Boolean(env.OPENAI_API_KEY && !env.OPENAI_API_KEY.includes("your-")),
+      requiredEnvVars: ["OPENAI_API_KEY"],
+      fallbackMode: "Synthetic LLM Engine",
+    },
+    {
+      providerName: "RUNWAY",
+      category: "AI_VIDEO",
+      status: getStatus(Boolean(env.RUNWAY_API_KEY && !env.RUNWAY_API_KEY.includes("your-"))),
+      isConfigured: Boolean(env.RUNWAY_API_KEY && !env.RUNWAY_API_KEY.includes("your-")),
+      requiredEnvVars: ["RUNWAY_API_KEY"],
+      fallbackMode: "FFmpeg Canvas Renderer",
+    },
+    {
+      providerName: "LUMA",
+      category: "AI_VIDEO",
+      status: getStatus(Boolean(env.LUMA_API_KEY && !env.LUMA_API_KEY.includes("your-"))),
+      isConfigured: Boolean(env.LUMA_API_KEY && !env.LUMA_API_KEY.includes("your-")),
+      requiredEnvVars: ["LUMA_API_KEY"],
+      fallbackMode: "FFmpeg Canvas Renderer",
+    },
+    {
+      providerName: "ELEVENLABS",
+      category: "AI_VOICE",
+      status: getStatus(Boolean(env.ELEVENLABS_API_KEY && !env.ELEVENLABS_API_KEY.includes("your-"))),
+      isConfigured: Boolean(env.ELEVENLABS_API_KEY && !env.ELEVENLABS_API_KEY.includes("your-")),
+      requiredEnvVars: ["ELEVENLABS_API_KEY"],
+      fallbackMode: "WebAudio Synthetic Voice",
+    },
+    {
+      providerName: "YOUTUBE",
+      category: "SOCIAL_PLATFORM",
+      status: getStatus(Boolean((env.YOUTUBE_CLIENT_ID || env.NEXT_PUBLIC_YOUTUBE_CLIENT_ID) && env.YOUTUBE_CLIENT_SECRET), false),
+      isConfigured: Boolean((env.YOUTUBE_CLIENT_ID || env.NEXT_PUBLIC_YOUTUBE_CLIENT_ID) && env.YOUTUBE_CLIENT_SECRET),
+      requiredEnvVars: ["YOUTUBE_CLIENT_ID", "YOUTUBE_CLIENT_SECRET"],
+      fallbackMode: "YouTube Simulation Publisher",
+    },
+    {
+      providerName: "INSTAGRAM",
+      category: "SOCIAL_PLATFORM",
+      status: getStatus(Boolean(env.FACEBOOK_APP_ID && env.FACEBOOK_APP_SECRET)),
+      isConfigured: Boolean(env.FACEBOOK_APP_ID && env.FACEBOOK_APP_SECRET),
+      requiredEnvVars: ["FACEBOOK_APP_ID", "FACEBOOK_APP_SECRET"],
+      fallbackMode: "Meta Simulation Publisher",
+    },
+    {
+      providerName: "FACEBOOK",
+      category: "SOCIAL_PLATFORM",
+      status: getStatus(Boolean(env.FACEBOOK_APP_ID && env.FACEBOOK_APP_SECRET)),
+      isConfigured: Boolean(env.FACEBOOK_APP_ID && env.FACEBOOK_APP_SECRET),
+      requiredEnvVars: ["FACEBOOK_APP_ID", "FACEBOOK_APP_SECRET"],
+      fallbackMode: "Meta Simulation Publisher",
+    },
+    {
+      providerName: "LINKEDIN",
+      category: "SOCIAL_PLATFORM",
+      status: getStatus(Boolean(env.LINKEDIN_CLIENT_ID && env.LINKEDIN_CLIENT_SECRET)),
+      isConfigured: Boolean(env.LINKEDIN_CLIENT_ID && env.LINKEDIN_CLIENT_SECRET),
+      requiredEnvVars: ["LINKEDIN_CLIENT_ID", "LINKEDIN_CLIENT_SECRET"],
+      fallbackMode: "LinkedIn Simulation Publisher",
+    },
+    {
+      providerName: "TIKTOK",
+      category: "SOCIAL_PLATFORM",
+      status: getStatus(Boolean(env.TIKTOK_CLIENT_KEY && env.TIKTOK_CLIENT_SECRET)),
+      isConfigured: Boolean(env.TIKTOK_CLIENT_KEY && env.TIKTOK_CLIENT_SECRET),
+      requiredEnvVars: ["TIKTOK_CLIENT_KEY", "TIKTOK_CLIENT_SECRET"],
+      fallbackMode: "TikTok Simulation Publisher",
+    },
+    {
+      providerName: "X",
+      category: "SOCIAL_PLATFORM",
+      status: getStatus(Boolean(env.X_API_KEY && env.X_API_SECRET)),
+      isConfigured: Boolean(env.X_API_KEY && env.X_API_SECRET),
+      requiredEnvVars: ["X_API_KEY", "X_API_SECRET"],
+      fallbackMode: "X Simulation Publisher",
+    },
+    {
+      providerName: "PINTEREST",
+      category: "SOCIAL_PLATFORM",
+      status: getStatus(Boolean(env.PINTEREST_APP_ID && env.PINTEREST_APP_SECRET)),
+      isConfigured: Boolean(env.PINTEREST_APP_ID && env.PINTEREST_APP_SECRET),
+      requiredEnvVars: ["PINTEREST_APP_ID", "PINTEREST_APP_SECRET"],
+      fallbackMode: "Pinterest Simulation Publisher",
+    },
+    {
+      providerName: "THREADS",
+      category: "SOCIAL_PLATFORM",
+      status: getStatus(Boolean(env.THREADS_APP_ID && env.THREADS_APP_SECRET)),
+      isConfigured: Boolean(env.THREADS_APP_ID && env.THREADS_APP_SECRET),
+      requiredEnvVars: ["THREADS_APP_ID", "THREADS_APP_SECRET"],
+      fallbackMode: "Threads Simulation Publisher",
+    },
+    {
+      providerName: "N8N",
+      category: "AUTOMATION",
+      status: getStatus(Boolean(env.N8N_WEBHOOK_SECRET)),
+      isConfigured: Boolean(env.N8N_WEBHOOK_SECRET),
+      requiredEnvVars: ["N8N_WEBHOOK_SECRET"],
+      fallbackMode: "Local Event Bus",
+    },
+    {
+      providerName: "DATABASE",
+      category: "DATABASE",
+      status: getStatus(Boolean(env.DATABASE_URL)),
+      isConfigured: Boolean(env.DATABASE_URL),
+      requiredEnvVars: ["DATABASE_URL"],
+      fallbackMode: "In-Memory PostgreSQL Cache",
+    },
+    {
+      providerName: "STORAGE",
+      category: "STORAGE",
+      status: getStatus(Boolean(env.STORAGE_BUCKET || env.NEXT_PUBLIC_APP_URL)),
+      isConfigured: Boolean(env.STORAGE_BUCKET || env.NEXT_PUBLIC_APP_URL),
+      requiredEnvVars: ["STORAGE_BUCKET"],
+      fallbackMode: "Local CDN Asset Server",
+    },
+    {
+      providerName: "ENCRYPTION",
+      category: "ENCRYPTION",
+      status: getStatus(Boolean(env.ENCRYPTION_SECRET)),
+      isConfigured: Boolean(env.ENCRYPTION_SECRET),
+      requiredEnvVars: ["ENCRYPTION_SECRET"],
+      fallbackMode: "Deterministic Key Derive",
+    },
+  ];
+}

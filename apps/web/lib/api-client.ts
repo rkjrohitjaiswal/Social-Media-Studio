@@ -13,16 +13,29 @@ import {
   CreateWorkspaceInput,
   WorkspaceResponse,
   ApprovalRequestResponse,
-  ApprovalAuditLogResponse,
 } from "@ai-social/shared";
 
-// Base API fetch wrapper with cookie credentials
+// Reads the active workspace ID from localStorage (set by StudioContext on switch).
+// Falls back to "demo-workspace-1" for SSR / unauthenticated dev sessions.
+function getActiveWorkspaceId(): string {
+  if (typeof window !== "undefined") {
+    return localStorage.getItem("activeWorkspaceId") || "demo-workspace-1";
+  }
+  return "demo-workspace-1";
+}
+
+// Base API fetch wrapper with cookie credentials.
+// Automatically attaches x-workspace-id so the backend can validate membership
+// for the currently active workspace. The backend still enforces that the
+// authenticated user belongs to the requested workspace — this header does NOT
+// bypass ownership or membership checks.
 async function apiFetch(endpoint: string, options: RequestInit = {}): Promise<Response> {
   const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
   const url = `${baseUrl}${endpoint}`;
 
   const defaultHeaders: HeadersInit = {
     "Content-Type": "application/json",
+    "x-workspace-id": getActiveWorkspaceId(),
   };
 
   const response = await fetch(url, {
@@ -235,7 +248,8 @@ export async function createWorkspace(name: string): Promise<WorkspaceResponse> 
 
 // Public Client Approval Link API
 export async function getPublicApprovalLink(token: string): Promise<ApprovalRequestResponse> {
-  const res = await fetch(`/api/approval-links/${token}`);
+  const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+  const res = await fetch(`${baseUrl}/api/approval-links/${token}`);
   if (!res.ok) {
     const errorMsg = await parseErrorMessage(res, "Approval link invalid or expired");
     throw new Error(errorMsg);
@@ -248,17 +262,25 @@ export async function reviewPublicApproval(
   token: string,
   action: "APPROVE" | "REQUEST_CHANGES",
   comment?: string
-): Promise<{ status: string; auditLogs: ApprovalAuditLogResponse[] }> {
-  const endpoint = action === "APPROVE" ? `/api/approval-links/${token}/approve` : `/api/approval-links/${token}/request-changes`;
-  const res = await fetch(endpoint, {
+): Promise<ApprovalRequestResponse> {
+  const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+  const endpoint = action === "APPROVE" ? "approve" : "request-changes";
+  const res = await fetch(`${baseUrl}/api/approval-links/${token}/${endpoint}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ comment }),
   });
   if (!res.ok) {
-    const errorMsg = await parseErrorMessage(res, "Failed to process review");
+    const errorMsg = await parseErrorMessage(res, "Failed to submit approval review");
     throw new Error(errorMsg);
   }
-  const body = (await (res.json() as Promise<unknown>)) as { data: { status: string; auditLogs: ApprovalAuditLogResponse[] } };
+  const body = (await (res.json() as Promise<unknown>)) as { data: ApprovalRequestResponse };
   return body.data;
+}
+
+export async function getAuthHeader(): Promise<Record<string, string>> {
+  return {
+    "Content-Type": "application/json",
+    "x-workspace-id": getActiveWorkspaceId(),
+  };
 }

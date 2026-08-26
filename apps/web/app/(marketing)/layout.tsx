@@ -20,7 +20,7 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
               STUDIO<span className="text-[#c5a059] font-sans text-xs ml-1 font-semibold tracking-widest">AI</span>
             </span>
             <span className="text-[10px] text-[#9e9d98] tracking-widest uppercase block mt-0.5">
-              Haute Social Engine
+              AI Social Engine
             </span>
           </div>
         </Link>
@@ -30,7 +30,7 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
             Platform Overview
           </Link>
           <Link href="/pricing" className="hover:text-[#f5f4f0] transition-colors">
-            Couture Pricing
+            Pricing
           </Link>
           <Link href="/about" className="hover:text-[#f5f4f0] transition-colors">
             Manifesto

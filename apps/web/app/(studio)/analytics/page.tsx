@@ -1,316 +1,540 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   BarChart3,
-  RefreshCw,
-  AlertTriangle,
-  ArrowUpRight,
-  ArrowDownRight,
   Sparkles,
+  Trophy,
+  Target,
+  Layers,
+  Clock,
+  Zap,
+  Loader2,
+  X,
+  ArrowRight,
+  RefreshCw,
+  Download,
+  Filter,
+  TrendingUp,
+  TrendingDown,
+  Tv,
+  Image as ImageIcon,
+  Video,
+  FileText,
+  Share2,
+  Bell,
+  HelpCircle,
+  User,
+  Building2,
+  ExternalLink,
   ChevronRight,
+  Eye,
+  CheckCircle2,
+  AlertCircle,
+  Flame,
+  Globe,
+  SlidersHorizontal,
 } from "lucide-react";
-import { InstagramIcon as Instagram } from "@/components/icons/InstagramIcon";
+import {
+  DetailedPerformanceAnalysis,
+  DetectedContentPattern,
+  BestPostingTimeReport,
+  AiNextContentRecommendation,
+} from "@ai-social/shared";
+import { getAuthHeader } from "@/lib/api-client";
 
-interface KPIData {
-  current: number;
-  previous: number | null;
-  changePct: number | null;
+interface AnalyticsOverviewData {
+  publishedCount: number;
+  totalImpressions: number;
+  totalReach: number;
+  totalEngagements: number;
+  averageEngagementRate: number;
+  followerGrowth: number;
+  topPerformingPlatform: string;
+  platformBreakdown: Record<string, number>;
+  recentPublishingActivity: Array<{
+    id: string;
+    platform: string;
+    publishedAt: string;
+    externalPostId?: string;
+    permalink?: string;
+  }>;
 }
 
-interface OverviewResponse {
-  hasData: boolean;
-  account: {
-    instagramAccountId: string;
-    followers: number;
-    followerGrowth: number;
-    status?: string;
-  } | null;
-  kpis: {
-    reach: KPIData;
-    impressions: KPIData;
-    engagementRate: KPIData;
-    likes: KPIData;
-    comments: KPIData;
-    saves: KPIData;
-    shares: KPIData;
-  };
-}
-
-interface MediaItem {
-  publicationId: string;
-  campaignId: string;
-  generatedAssetId: string;
-  instagramMediaId?: string;
-  caption: string;
-  hashtags: string[];
+interface TopContentItem {
+  id: string;
+  title: string;
+  topic: string;
+  format: string;
+  contentType: string;
+  platform: string;
+  pillarName: string;
+  hook: string;
   cta: string;
-  publishedAt: string;
-  qualityScore: number | null;
-  qualityVerdict: string | null;
   metrics: {
+    engagementRate: number;
     reach: number;
-    impressions: number;
-    likes: number;
-    comments: number;
     saves: number;
     shares: number;
-    engagements: number;
-    engagementRate: number;
+    impressions?: number;
+    likes?: number;
+    comments?: number;
   };
 }
 
+interface MediaAnalyticsItem {
+  id: string;
+  platform: string;
+  impressions: number;
+  reach: number;
+  likes: number;
+  comments: number;
+  saves: number;
+  shares: number;
+  engagementRate: number;
+  publishedAt: string;
+  permalink?: string;
+  hasSnapshotData?: boolean;
+}
+
+interface TimeseriesPoint {
+  date: string;
+  impressions: number;
+  engagements: number;
+}
+
+type ChartMetric = "views" | "reach" | "engagement" | "followers" | "watchTime";
+
 export default function AnalyticsDashboardPage() {
-  const [period, setPeriod] = useState<"7d" | "30d" | "90d" | "custom">("30d");
-  const [selectedMetric, setSelectedMetric] = useState<
-    "reach" | "impressions" | "engagement" | "likes" | "comments" | "saves" | "shares"
-  >("reach");
-  const [sortBy, setSortBy] = useState<"engagementRate" | "reach" | "saves" | "shares">("engagementRate");
-  
-  const [loading, setLoading] = useState(true);
-  const [syncing, setSyncing] = useState(false);
-  
-  const [overview, setOverview] = useState<OverviewResponse | null>(null);
-  const [mediaItems, setMediaItems] = useState<MediaItem[]>([]);
-  const [timeSeries, setTimeSeries] = useState<Array<{ date: string; value: number }>>([]);
-  
-  const [accountStatus] = useState<"CONNECTED" | "DISCONNECTED" | "REAUTH_REQUIRED" | "ERROR">("CONNECTED");
-  const [connectedAccountName] = useState<string>("maisonlumiere_official");
+  const router = useRouter();
+  const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
-  useEffect(() => {
-    let isMounted = true;
-    async function loadAllAnalytics() {
-      setLoading(true);
-      try {
-        const resOverview = await fetch((process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000") + `/api/analytics/overview?period=${period}`);
-        const dataOverview = await resOverview.json();
-        if (isMounted && dataOverview.success) {
-          setOverview(dataOverview.data);
-        }
+  // Filter & Toolbar Controls State
+  const [selectedPlatformFilter, setSelectedPlatformFilter] = useState<string>("ALL");
+  const [selectedDateRange, setSelectedDateRange] = useState<string>("30D");
+  const [selectedSortMetric, setSelectedSortMetric] = useState<
+    "engagement" | "reach" | "impressions" | "clicks" | "likes" | "comments" | "shares" | "saves" | "views"
+  >("engagement");
+  const [chartMetric, setChartMetric] = useState<ChartMetric>("views");
 
-        const resMedia = await fetch((process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000") + `/api/analytics/media?sort=${sortBy}&limit=10`);
-        const dataMedia = await resMedia.json();
-        if (isMounted && dataMedia.success) {
-          setMediaItems(dataMedia.data.items || []);
-        }
+  // Data Loading & State
+  const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [overview, setOverview] = useState<AnalyticsOverviewData | null>(null);
+  const [topItems, setTopItems] = useState<TopContentItem[]>([]);
+  const [mediaList, setMediaList] = useState<MediaAnalyticsItem[]>([]);
+  const [timeseries, setTimeseries] = useState<TimeseriesPoint[]>([]);
+  const [patterns, setPatterns] = useState<DetectedContentPattern[]>([]);
+  const [bestTime, setBestTime] = useState<BestPostingTimeReport | null>(null);
+  const [nextContentRecs, setNextContentRecs] = useState<AiNextContentRecommendation[]>([]);
+  const [providersStatus, setProvidersStatus] = useState<Record<string, { ready: boolean; name: string }>>({});
 
-        const resTs = await fetch((process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000") + `/api/analytics/timeseries?metric=${selectedMetric}&period=${period}`);
-        const dataTs = await resTs.json();
-        if (isMounted && dataTs.success) {
-          setTimeSeries(dataTs.data.series || []);
-        }
-      } catch {
-        // Ignore network errors
-      } finally {
-        if (isMounted) setLoading(false);
-      }
+  // Analysis Modal State
+  const [analysisModalItem, setAnalysisModalItem] = useState<TopContentItem | null>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analysisReport, setAnalysisReport] = useState<DetailedPerformanceAnalysis | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // Timezone Name
+  const userTimezone = useMemo(() => {
+    try {
+      return Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Kolkata";
+    } catch {
+      return "Asia/Kolkata";
     }
-
-    loadAllAnalytics();
-    return () => {
-      isMounted = false;
-    };
-  }, [period, sortBy, selectedMetric]);
-
-  // Subscribe to SSE Events for background synchronization updates
-  useEffect(() => {
-    const eventSource = new EventSource((process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000") + "/api/analytics/events");
-    eventSource.onmessage = (event) => {
-      try {
-        const parsed = JSON.parse(event.data);
-        if (parsed.type === "analytics.sync.completed") {
-          setSyncing(false);
-        } else if (parsed.type === "analytics.sync.started") {
-          setSyncing(true);
-        } else if (parsed.type === "analytics.sync.failed") {
-          setSyncing(false);
-        }
-      } catch {
-        // SSE parse error
-      }
-    };
-    return () => eventSource.close();
   }, []);
 
-  const handleManualSync = async () => {
-    setSyncing(true);
+  // Fetch Workspace Analytics Data
+  const loadAnalyticsData = async (isManualRefresh = false) => {
+    if (isManualRefresh) setIsRefreshing(true);
+    else setIsLoading(true);
+    setErrorMsg(null);
+
     try {
-      await fetch((process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000") + "/api/analytics/sync", { method: "POST" });
+      const authHeader = await getAuthHeader();
+
+      const [
+        overviewRes,
+        topRes,
+        mediaRes,
+        tsRes,
+        patRes,
+        timeRes,
+        nextRes,
+        provRes,
+      ] = await Promise.all([
+        fetch(`${apiBase}/api/analytics/overview`, { headers: { ...authHeader } }),
+        fetch(
+          `${apiBase}/api/analytics/top-performing?sortBy=${selectedSortMetric}&platform=${selectedPlatformFilter}`,
+          { headers: { ...authHeader } }
+        ),
+        fetch(`${apiBase}/api/analytics/media`, { headers: { ...authHeader } }),
+        fetch(`${apiBase}/api/analytics/timeseries`, { headers: { ...authHeader } }),
+        fetch(`${apiBase}/api/analytics/patterns`, { headers: { ...authHeader } }),
+        fetch(`${apiBase}/api/analytics/best-posting-time`, { headers: { ...authHeader } }),
+        fetch(`${apiBase}/api/analytics/next-content`, { headers: { ...authHeader } }),
+        fetch(`${apiBase}/api/integrations/providers/status`, { headers: { ...authHeader } }),
+      ]);
+
+      const [
+        overviewJson,
+        topJson,
+        mediaJson,
+        tsJson,
+        patJson,
+        timeJson,
+        nextJson,
+        provJson,
+      ] = await Promise.all([
+        overviewRes.json(),
+        topRes.json(),
+        mediaRes.json(),
+        tsRes.json(),
+        patRes.json(),
+        timeRes.json(),
+        nextRes.json(),
+        provRes.json(),
+      ]);
+
+      if (overviewJson.success && overviewJson.data) setOverview(overviewJson.data);
+      if (topJson.success && topJson.data) setTopItems(topJson.data.items || []);
+      if (mediaJson.success && mediaJson.data) setMediaList(mediaJson.data || []);
+      if (tsJson.success && Array.isArray(tsJson.data)) setTimeseries(tsJson.data || []);
+      if (patJson.success && patJson.data) setPatterns(patJson.data || []);
+      if (timeJson.success && timeJson.data) setBestTime(timeJson.data || null);
+      if (nextJson.success && nextJson.data) setNextContentRecs(nextJson.data || []);
+      if (provJson.success && provJson.data) setProvidersStatus(provJson.data || {});
     } catch {
-      setSyncing(false);
+      setErrorMsg("Failed to load analytics data.");
+    } finally {
+      setIsLoading(false);
+      setIsRefreshing(false);
     }
   };
 
-  const renderKPI = (
-    label: string,
-    value: number | string,
-    kpiKey?: keyof OverviewResponse["kpis"],
-    isPct: boolean = false
-  ) => {
-    const kpi = overview?.kpis?.[kpiKey as keyof OverviewResponse["kpis"]];
-    const hasComp = kpi && kpi.changePct !== null;
+  useEffect(() => {
+    loadAnalyticsData();
+  }, [selectedSortMetric, selectedPlatformFilter, selectedDateRange]);
 
+  // Determine if workspace has connected analytics data
+  const hasAnalyticsData = useMemo(() => {
+    if (!overview) return false;
     return (
-      <div className="glass-card p-5 rounded-2xl space-y-2 relative overflow-hidden border border-white/10 hover:border-[#c5a059]/40 transition-all">
-        <span className="text-[11px] font-semibold text-[#9e9d98] uppercase tracking-wider block">
-          {label}
-        </span>
-        <div className="text-2xl lg:text-3xl font-serif-luxury font-bold text-[#f5f4f0]">
-          {isPct && typeof value === "number" ? `${value.toFixed(2)}%` : value.toLocaleString()}
-        </div>
-
-        <div className="text-[11px] font-mono font-medium flex items-center gap-1">
-          {hasComp && kpi.changePct !== null ? (
-            kpi.changePct >= 0 ? (
-              <span className="text-[#4e8765] flex items-center">
-                <ArrowUpRight className="w-3.5 h-3.5" /> +{kpi.changePct}% vs prev period
-              </span>
-            ) : (
-              <span className="text-[#a84b4b] flex items-center">
-                <ArrowDownRight className="w-3.5 h-3.5" /> {kpi.changePct}% vs prev period
-              </span>
-            )
-          ) : (
-            <span className="text-[#6b6a65]">No comparison available</span>
-          )}
-        </div>
-      </div>
+      overview.publishedCount > 0 ||
+      overview.totalImpressions > 0 ||
+      overview.totalEngagements > 0 ||
+      mediaList.length > 0 ||
+      topItems.length > 0
     );
+  }, [overview, mediaList, topItems]);
+
+  // Content Format Breakdown (Calculated from real backend media data)
+  const formatBreakdown = useMemo(() => {
+    const counts: Record<string, { count: number; avgEngRate: number }> = {
+      Video: { count: 0, avgEngRate: 0 },
+      Image: { count: 0, avgEngRate: 0 },
+      Carousel: { count: 0, avgEngRate: 0 },
+      Text: { count: 0, avgEngRate: 0 },
+      Short: { count: 0, avgEngRate: 0 },
+    };
+
+    if (mediaList.length > 0) {
+      for (const item of mediaList) {
+        const plat = item.platform?.toUpperCase() || "";
+        const fmt = plat.includes("YOUTUBE")
+          ? "Video"
+          : plat.includes("INSTAGRAM")
+          ? "Image"
+          : plat.includes("TIKTOK")
+          ? "Short"
+          : plat.includes("LINKEDIN")
+          ? "Text"
+          : "Carousel";
+
+        if (counts[fmt]) {
+          counts[fmt].count += 1;
+          counts[fmt].avgEngRate = Math.max(counts[fmt].avgEngRate, item.engagementRate || 0);
+        }
+      }
+    }
+
+    return counts;
+  }, [mediaList]);
+
+  // Export Analytics Data as JSON
+  const handleExportData = () => {
+    try {
+      const exportPayload = {
+        exportedAt: new Date().toISOString(),
+        workspace: "Demo Workspace",
+        timezone: userTimezone,
+        overview,
+        topContent: topItems,
+        publishedMedia: mediaList,
+        timeseries,
+      };
+
+      const blob = new Blob([JSON.stringify(exportPayload, null, 2)], {
+        type: "application/json",
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `ai-social-analytics-${new Date().toISOString().split("T")[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch {
+      setErrorMsg("Failed to export analytics data.");
+    }
   };
 
-  if (loading && !overview) {
-    return (
-      <div className="py-24 text-center space-y-4">
-        <div className="w-8 h-8 border-2 border-[#c5a059] border-t-transparent rounded-full animate-spin mx-auto" />
-        <p className="text-xs font-mono text-[#9e9d98]">Loading performance intelligence command center...</p>
-      </div>
-    );
-  }
+  // Helper Platform Icon Mapper
+  const renderPlatformIcon = (platformStr: string) => {
+    const p = platformStr.toUpperCase();
+    if (p.includes("YOUTUBE")) return <Tv className="w-4 h-4 text-[#D4AF37]" />;
+    if (p.includes("INSTAGRAM")) return <ImageIcon className="w-4 h-4 text-[#D4AF37]" />;
+    if (p.includes("TIKTOK")) return <Video className="w-4 h-4 text-[#D4AF37]" />;
+    if (p.includes("LINKEDIN")) return <FileText className="w-4 h-4 text-[#D4AF37]" />;
+    if (p.includes("X") || p.includes("TWITTER")) return <Share2 className="w-4 h-4 text-[#D4AF37]" />;
+    return <Layers className="w-4 h-4 text-[#D4AF37]" />;
+  };
 
   return (
-    <div className="space-y-8 pb-16">
-      {/* TOP HEADER COMMAND CENTER */}
-      <div className="border-b border-white/10 pb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+    <div className="min-h-screen bg-[#0B0C0E] text-[#F5F4F0] p-4 sm:p-6 lg:p-8 space-y-6 font-sans selection:bg-[#D4AF37]/30">
+      {/* 1. TOP HEADER */}
+      <header className="border-b border-white/[0.08] pb-6 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2 text-xs text-[#c5a059] uppercase tracking-widest font-semibold mb-1">
-            <BarChart3 className="w-4 h-4" />
-            <span>Performance Intelligence Command Center</span>
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-[10px] font-mono uppercase tracking-wider font-bold text-[#D4AF37] bg-[#D4AF37]/10 px-2 py-0.5 rounded border border-[#D4AF37]/20">
+              AI SOCIAL MEDIA STUDIO
+            </span>
           </div>
-          <h1 className="font-serif-luxury text-3xl md:text-4xl font-bold text-[#f5f4f0]">
-            Instagram Analytics
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#F5F4F0]">
+            Analytics
           </h1>
-          <p className="text-xs text-[#9e9d98] mt-1">
-            Real-time Insights, Audience Reach &amp; AI Quality Correlation.
+          <p className="text-xs sm:text-sm text-[#9E9D98] mt-0.5">
+            Understand what is working across your connected channels.
           </p>
         </div>
 
-        {/* CONTROLS BAR: ACCOUNT SELECTOR, DATE FILTERS, MANUAL SYNC */}
+        {/* Right Header Navigation Controls */}
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3 shrink-0 font-mono text-xs">
+          {/* Workspace Selector */}
+          <div className="px-3 py-1.5 rounded-xl bg-[#151618] border border-white/[0.08] text-[#F5F4F0] flex items-center gap-2">
+            <Building2 className="w-3.5 h-3.5 text-[#D4AF37]" />
+            <span className="font-bold">Demo Workspace</span>
+          </div>
+
+          {/* Help Link */}
+          <Link
+            href="/help"
+            className="p-2 rounded-xl bg-[#151618] border border-white/[0.08] text-[#9E9D98] hover:text-[#F5F4F0] transition-colors"
+            title="Help & Documentation"
+          >
+            <HelpCircle className="w-4 h-4" />
+          </Link>
+
+          {/* Account Menu Button */}
+          <Link
+            href="/settings/profile"
+            className="px-3 py-1.5 rounded-xl bg-[#151618] border border-white/[0.08] text-[#F5F4F0] hover:border-[#D4AF37]/40 transition-all flex items-center gap-1.5"
+          >
+            <User className="w-3.5 h-3.5 text-[#D4AF37]" />
+            <span>Account</span>
+          </Link>
+        </div>
+      </header>
+
+      {/* 2. ANALYTICS TOOLBAR */}
+      <div className="bg-[#151618] border border-white/[0.08] rounded-3xl p-4 flex flex-col lg:flex-row lg:items-center justify-between gap-4 font-mono text-xs">
+        {/* Left: Platform & Date Range Filters */}
         <div className="flex flex-wrap items-center gap-3">
-          {/* Account Selector */}
-          <div className="flex items-center gap-2 px-3 py-2 rounded-xl glass-panel border border-white/10 text-xs">
-            <Instagram className="w-4 h-4 text-[#c5a059]" />
-            <span className="font-mono text-[#f5f4f0] font-semibold">@{connectedAccountName}</span>
-            {accountStatus === "REAUTH_REQUIRED" && (
-              <span className="px-2 py-0.5 rounded-full bg-[#a84b4b]/20 text-[#a84b4b] text-[10px] font-bold">
-                Re-auth Required
-              </span>
-            )}
+          {/* Platform Selector */}
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] text-[#9E9D98] uppercase">Platform:</span>
+            <select
+              value={selectedPlatformFilter}
+              onChange={(e) => setSelectedPlatformFilter(e.target.value)}
+              className="bg-[#0B0C0E] border border-white/10 rounded-xl px-3 py-1.5 text-xs text-[#F5F4F0] focus:border-[#D4AF37]/50 outline-none"
+            >
+              <option value="ALL">All Platforms</option>
+              <option value="YOUTUBE">YouTube</option>
+              <option value="INSTAGRAM">Instagram</option>
+              <option value="TIKTOK">TikTok</option>
+              <option value="FACEBOOK">Facebook</option>
+              <option value="LINKEDIN">LinkedIn</option>
+              <option value="X">X / Twitter</option>
+              <option value="THREADS">Threads</option>
+              <option value="PINTEREST">Pinterest</option>
+            </select>
           </div>
 
           {/* Date Range Selector */}
-          <div className="flex items-center bg-[#14161a] p-1 rounded-xl border border-white/10 text-xs">
-            {(["7d", "30d", "90d"] as const).map((p) => (
+          <div className="flex items-center gap-1 bg-[#0B0C0E] border border-white/[0.08] p-1 rounded-xl">
+            {[
+              { id: "7D", label: "7 Days" },
+              { id: "30D", label: "30 Days" },
+              { id: "90D", label: "90 Days" },
+              { id: "CUSTOM", label: "Custom" },
+            ].map((range) => (
               <button
-                key={p}
-                onClick={() => setPeriod(p)}
-                className={`px-3 py-1.5 rounded-lg transition-all font-mono font-medium ${
-                  period === p
-                    ? "bg-[#c5a059] text-[#0b0c0e] font-bold"
-                    : "text-[#9e9d98] hover:text-[#f5f4f0]"
+                key={range.id}
+                onClick={() => setSelectedDateRange(range.id)}
+                className={`px-2.5 py-1 rounded-lg font-bold transition-all ${
+                  selectedDateRange === range.id
+                    ? "bg-[#D4AF37] text-[#0B0C0E]"
+                    : "text-[#9E9D98] hover:text-[#F5F4F0]"
                 }`}
               >
-                {p.toUpperCase()}
+                {range.label}
               </button>
             ))}
           </div>
+        </div>
 
-          {/* Sync Insights Button */}
+        {/* Right: Actions (Refresh & Export) */}
+        <div className="flex items-center gap-2 shrink-0">
           <button
-            onClick={handleManualSync}
-            disabled={syncing}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-[#c5a059] to-[#d4af37] text-[#0b0c0e] text-xs font-bold font-mono hover:opacity-90 transition-all disabled:opacity-50 shadow-md"
+            onClick={() => loadAnalyticsData(true)}
+            disabled={isRefreshing}
+            className="px-3.5 py-1.5 rounded-xl bg-[#0B0C0E] border border-white/10 text-[#F5F4F0] hover:border-[#D4AF37]/40 transition-all flex items-center gap-1.5 disabled:opacity-50"
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${syncing ? "animate-spin" : ""}`} />
-            <span>{syncing ? "Syncing..." : "Sync Insights"}</span>
+            <RefreshCw className={`w-3.5 h-3.5 text-[#D4AF37] ${isRefreshing ? "animate-spin" : ""}`} />
+            <span>Refresh</span>
+          </button>
+
+          <button
+            onClick={handleExportData}
+            className="px-3.5 py-1.5 rounded-xl bg-[#D4AF37] text-[#0B0C0E] font-bold hover:opacity-95 transition-all flex items-center gap-1.5"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span>Export Data</span>
           </button>
         </div>
       </div>
 
-      {/* INSTAGRAM REAUTH WARNING IF APPLICABLE */}
-      {accountStatus === "REAUTH_REQUIRED" && (
-        <div className="glass-panel p-4 rounded-2xl border-l-4 border-l-[#a84b4b] flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <AlertTriangle className="w-5 h-5 text-[#a84b4b]" />
-            <div>
-              <p className="text-xs font-bold text-[#f5f4f0]">Instagram Authorization Expired</p>
-              <p className="text-[11px] text-[#9e9d98]">
-                Your access token for @{connectedAccountName} needs to be re-authenticated to fetch new analytics.
-              </p>
-            </div>
+      {/* FEEDBACK ALERTS */}
+      {errorMsg && (
+        <div className="p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 shrink-0" />
+            <span>{errorMsg}</span>
+          </div>
+          <button onClick={() => setErrorMsg(null)} className="text-rose-400 hover:text-white">
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+
+      {/* 3. EMPTY / UNCONNECTED WORKSPACE STATE */}
+      {!isLoading && !hasAnalyticsData && (
+        <div className="bg-[#151618] border border-white/[0.08] rounded-3xl p-12 text-center space-y-4 max-w-lg mx-auto my-6">
+          <BarChart3 className="w-12 h-12 text-[#9E9D98] mx-auto opacity-40" />
+          <div className="space-y-1">
+            <h2 className="text-lg font-bold text-[#F5F4F0]">No analytics data yet</h2>
+            <p className="text-xs text-[#9E9D98] font-mono">
+              Connect your social channels to start tracking performance across your content.
+            </p>
           </div>
           <Link
-            href="/settings/integrations"
-            className="px-3 py-1.5 rounded-lg bg-[#a84b4b] text-white text-xs font-semibold hover:bg-[#a84b4b]/80 transition-all"
+            href="/settings/social-accounts"
+            className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#D4AF37] to-[#C5A059] text-[#0B0C0E] font-bold text-xs hover:opacity-95 transition-all inline-flex items-center gap-2"
           >
-            Reconnect Account
+            <Globe className="w-4 h-4" />
+            <span>Connect Channels</span>
           </Link>
         </div>
       )}
 
-      {/* TOP 7 KPI CARDS */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
-        {renderKPI("Reach", overview?.kpis?.reach?.current || 0, "reach")}
-        {renderKPI("Impressions", overview?.kpis?.impressions?.current || 0, "impressions")}
-        {renderKPI("Eng. Rate", overview?.kpis?.engagementRate?.current || 0, "engagementRate", true)}
-        {renderKPI("Likes", overview?.kpis?.likes?.current || 0, "likes")}
-        {renderKPI("Comments", overview?.kpis?.comments?.current || 0, "comments")}
-        {renderKPI("Saves", overview?.kpis?.saves?.current || 0, "saves")}
-        {renderKPI("Shares", overview?.kpis?.shares?.current || 0, "shares")}
+      {/* 4. AI PERFORMANCE INSIGHTS SECTION */}
+      <div className="bg-[#151618] border border-white/[0.08] rounded-3xl p-5 space-y-3">
+        <div className="flex items-center gap-2 text-xs font-mono font-bold text-[#D4AF37]">
+          <Sparkles className="w-4 h-4" />
+          <span>AI PERFORMANCE INSIGHTS</span>
+        </div>
+
+        {hasAnalyticsData && (patterns.length > 0 || nextContentRecs.length > 0) ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {patterns.slice(0, 2).map((pat, idx) => (
+              <div key={idx} className="p-3.5 rounded-2xl bg-[#0B0C0E] border border-white/[0.06] space-y-1 text-xs">
+                <span className="text-[10px] font-mono text-[#D4AF37] font-bold uppercase">{pat.dimension}</span>
+                <p className="text-[#F5F4F0] font-semibold">{pat.patternObservation}</p>
+                <p className="text-[11px] text-[#9E9D98] italic font-serif">
+                  Confidence: {pat.confidence} ({pat.performanceMultiplier}x performance)
+                </p>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-xs text-[#9E9D98] font-mono italic">
+            Connect your social channels to unlock AI-powered performance insights.
+          </p>
+        )}
       </div>
 
-      {/* PERFORMANCE CHART EDGE */}
-      <div className="glass-card p-6 rounded-3xl space-y-6 border border-white/10">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/10 pb-4">
+      {/* 5. KPI OVERVIEW CARDS */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3">
+        {[
+          {
+            label: "Total Reach / Views",
+            value: overview && overview.totalReach > 0 ? overview.totalReach.toLocaleString() : "No data yet",
+          },
+          {
+            label: "Engagement",
+            value: overview && overview.totalEngagements > 0 ? overview.totalEngagements.toLocaleString() : "No data yet",
+          },
+          {
+            label: "Engagement Rate",
+            value: overview && overview.averageEngagementRate > 0 ? `${overview.averageEngagementRate}%` : "No data yet",
+          },
+          {
+            label: "Followers",
+            value: overview && overview.followerGrowth > 0 ? overview.followerGrowth.toLocaleString() : "No data yet",
+          },
+          {
+            label: "Published",
+            value: overview ? overview.publishedCount.toString() : "No data yet",
+          },
+          {
+            label: "Scheduled",
+            value: hasAnalyticsData ? "Active" : "No data yet",
+          },
+          {
+            label: "Watch Time",
+            value: "No data yet",
+          },
+        ].map((kpi) => (
+          <div key={kpi.label} className="bg-[#151618] border border-white/[0.08] p-3.5 rounded-2xl space-y-1">
+            <span className="text-[10px] font-mono text-[#9E9D98] uppercase block">{kpi.label}</span>
+            <span className="text-sm sm:text-base font-mono font-bold text-[#F5F4F0] block truncate">
+              {kpi.value}
+            </span>
+          </div>
+        ))}
+      </div>
+
+      {/* 6. PERFORMANCE OVER TIME CHART */}
+      <div className="bg-[#151618] border border-white/[0.08] rounded-3xl p-6 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/[0.06] pb-3">
           <div>
-            <h3 className="font-serif-luxury text-xl font-bold text-[#f5f4f0]">
-              Publication Performance Over Time
-            </h3>
-            <p className="text-xs text-[#9e9d98] mt-0.5">
-              Historical audience metrics across {period.toUpperCase()} timeframe.
-            </p>
+            <h3 className="text-sm font-bold font-mono text-[#F5F4F0]">Performance Over Time</h3>
+            <p className="text-[11px] text-[#9E9D98] font-mono">Real-time performance trend metrics</p>
           </div>
 
           {/* Metric Selector Tabs */}
-          <div className="flex flex-wrap items-center gap-1.5 bg-[#14161a] p-1 rounded-xl border border-white/10 text-xs font-mono">
-            {(
-              [
-                "reach",
-                "impressions",
-                "engagement",
-                "likes",
-                "comments",
-                "saves",
-                "shares",
-              ] as const
-            ).map((m) => (
+          <div className="flex items-center gap-1 bg-[#0B0C0E] border border-white/[0.08] p-1 rounded-xl font-mono text-xs">
+            {(["views", "reach", "engagement", "followers", "watchTime"] as const).map((m) => (
               <button
                 key={m}
-                onClick={() => setSelectedMetric(m)}
-                className={`px-2.5 py-1 rounded-lg capitalize transition-all ${
-                  selectedMetric === m
-                    ? "bg-[#c5a059]/20 text-[#c5a059] font-bold border border-[#c5a059]/40"
-                    : "text-[#9e9d98] hover:text-[#f5f4f0]"
+                onClick={() => setChartMetric(m)}
+                className={`px-2.5 py-1 rounded-lg font-bold capitalize transition-all ${
+                  chartMetric === m
+                    ? "bg-[#D4AF37] text-[#0B0C0E]"
+                    : "text-[#9E9D98] hover:text-[#F5F4F0]"
                 }`}
               >
                 {m}
@@ -319,86 +543,117 @@ export default function AnalyticsDashboardPage() {
           </div>
         </div>
 
-        {/* CHART BODY OR EMPTY STATE */}
-        {!overview?.hasData && timeSeries.length === 0 ? (
-          <div className="h-64 flex flex-col items-center justify-center text-center p-8 border border-dashed border-white/10 rounded-2xl">
-            <BarChart3 className="w-10 h-10 text-[#6b6a65] mb-3" />
-            <h4 className="text-sm font-semibold text-[#f5f4f0]">No Analytics Data Available</h4>
-            <p className="text-xs text-[#9e9d98] max-w-sm mt-1">
-              Analytics will appear after your first synchronized Instagram insights. Click &quot;Sync Insights&quot; to fetch metrics.
-            </p>
-          </div>
-        ) : (
-          <div className="h-64 flex items-end justify-between gap-3 pt-8 px-4 border-b border-white/10">
-            {timeSeries.map((pt, i) => {
-              const maxVal = Math.max(...timeSeries.map((t) => t.value), 1);
-              const heightPct = Math.max(10, Math.round((pt.value / maxVal) * 100));
+        {/* Chart View Representation */}
+        {timeseries.length > 0 ? (
+          <div className="h-48 flex items-end justify-between gap-2 pt-4 border-b border-white/[0.06]">
+            {timeseries.map((pt, idx) => {
+              const heightPct = Math.min(100, Math.max(15, (pt.impressions / 8000) * 100));
               return (
-                <div key={i} className="flex-1 flex flex-col items-center gap-2 group">
-                  <div className="text-[10px] font-mono text-[#c5a059] opacity-0 group-hover:opacity-100 transition-opacity font-bold">
-                    {pt.value.toLocaleString()}
-                  </div>
+                <div key={idx} className="flex-1 flex flex-col items-center gap-1 group">
                   <div
-                    className="w-full max-w-[40px] bg-gradient-to-t from-[#c5a059]/30 to-[#c5a059] rounded-t-xl group-hover:brightness-125 transition-all shadow-md"
                     style={{ height: `${heightPct}%` }}
+                    className="w-full max-w-[24px] bg-[#D4AF37]/30 group-hover:bg-[#D4AF37] rounded-t-md transition-all"
                   />
-                  <div className="text-[10px] font-mono text-[#9e9d98] truncate max-w-[48px]">
-                    {pt.date}
-                  </div>
+                  <span className="text-[9px] font-mono text-[#9E9D98] truncate w-full text-center">
+                    {pt.date.split("-").slice(1).join("/")}
+                  </span>
                 </div>
               );
             })}
           </div>
+        ) : (
+          <div className="h-36 flex items-center justify-center border border-dashed border-white/[0.08] rounded-2xl text-xs font-mono text-[#9E9D98]">
+            No timeseries chart snapshot data recorded yet.
+          </div>
         )}
       </div>
 
-      {/* CREATIVE QUALITY VS PERFORMANCE & BEST CONTENT INSIGHTS */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* QUALITY VS PERFORMANCE INTELLIGENCE */}
-        <div className="glass-card p-6 rounded-3xl space-y-4 border border-white/10">
-          <div className="flex items-center justify-between border-b border-white/10 pb-3">
-            <div>
-              <h3 className="font-serif-luxury text-lg font-bold text-[#f5f4f0]">
-                Creative Quality vs Performance
-              </h3>
-              <p className="text-xs text-[#9e9d98]">
-                Correlation between AI Quality Score &amp; audience engagement rate.
-              </p>
-            </div>
-            <span className="px-2.5 py-1 rounded-full bg-[#c5a059]/15 text-[#c5a059] text-[10px] font-bold font-mono">
-              Correlation
-            </span>
+      {/* 7. PLATFORM PERFORMANCE COMPARISON */}
+      <div className="bg-[#151618] border border-white/[0.08] rounded-3xl p-6 space-y-4">
+        <h3 className="text-sm font-bold font-mono text-[#F5F4F0]">Platform Performance</h3>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          {[
+            { id: "youtube", name: "YouTube" },
+            { id: "instagram", name: "Instagram" },
+            { id: "tiktok", name: "TikTok" },
+            { id: "linkedin", name: "LinkedIn" },
+            { id: "x", name: "X (Twitter)" },
+            { id: "facebook", name: "Facebook" },
+            { id: "threads", name: "Threads" },
+            { id: "pinterest", name: "Pinterest" },
+          ].map((p) => {
+            const isReady = providersStatus[p.id]?.ready || false;
+            const count = overview?.platformBreakdown[p.name.toUpperCase()] || 0;
+
+            return (
+              <div
+                key={p.id}
+                className="p-4 rounded-2xl bg-[#0B0C0E] border border-white/[0.06] flex items-center justify-between gap-3"
+              >
+                <div className="flex items-center gap-3">
+                  {renderPlatformIcon(p.name)}
+                  <div>
+                    <h4 className="text-xs font-bold text-[#F5F4F0]">{p.name}</h4>
+                    <p className="text-[10px] font-mono text-[#9E9D98]">
+                      {count > 0 ? `${count} posts` : "No activity"}
+                    </p>
+                  </div>
+                </div>
+
+                <span
+                  className={`px-2 py-0.5 rounded text-[9px] font-mono font-bold ${
+                    isReady
+                      ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                      : "bg-white/5 text-[#9E9D98] border border-white/10"
+                  }`}
+                >
+                  {isReady ? "CONNECTED" : "Not connected"}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* 8. TOP PERFORMING CONTENT & FORMAT ANALYSIS GRID */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Top Performing Content (2 cols) */}
+        <div className="lg:col-span-2 bg-[#151618] border border-white/[0.08] rounded-3xl p-6 space-y-4">
+          <div className="flex items-center justify-between border-b border-white/[0.06] pb-3">
+            <h3 className="text-sm font-bold font-mono text-[#F5F4F0]">Top Performing Content</h3>
+            <span className="text-xs font-mono text-[#9E9D98]">{topItems.length} items</span>
           </div>
 
-          {mediaItems.length < 2 ? (
-            <p className="text-xs text-[#9e9d98] italic py-8 text-center">
-              More published content is required for a meaningful comparison.
+          {topItems.length === 0 ? (
+            <p className="text-xs font-mono text-[#9E9D98] text-center py-8">
+              No published performance data yet.
             </p>
           ) : (
-            <div className="space-y-3 pt-2">
-              {mediaItems.slice(0, 4).map((item, idx) => (
+            <div className="space-y-3">
+              {topItems.map((item) => (
                 <div
-                  key={idx}
-                  className="flex items-center justify-between p-3 rounded-xl bg-[#14161a] border border-white/5"
+                  key={item.id}
+                  className="p-4 rounded-2xl bg-[#0B0C0E] border border-white/[0.08] hover:border-[#D4AF37]/40 transition-all flex items-center justify-between gap-4"
                 >
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-lg bg-[#1c1f26] border border-white/10 flex items-center justify-center font-mono text-xs text-[#c5a059] font-bold">
-                      {item.qualityScore ? `${item.qualityScore}%` : "N/A"}
-                    </div>
-                    <div>
-                      <p className="text-xs font-semibold text-[#f5f4f0] line-clamp-1">
-                        {item.caption || "Instagram Publication"}
-                      </p>
-                      <p className="text-[10px] text-[#9e9d98]">
-                        Quality Score: {item.qualityScore}%
+                  <div className="flex items-center gap-3 truncate">
+                    {renderPlatformIcon(item.platform)}
+                    <div className="truncate">
+                      <h4 className="text-xs font-bold text-[#F5F4F0] truncate">{item.title || item.topic}</h4>
+                      <p className="text-[10px] text-[#9E9D98] font-mono">
+                        {item.platform} • {item.contentType || item.format}
                       </p>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <span className="text-xs font-mono font-bold text-[#c5a059]">
-                      {item.metrics.engagementRate}% Eng. Rate
-                    </span>
-                    <p className="text-[10px] text-[#9e9d98]">{item.metrics.reach} reach</p>
+
+                  <div className="flex items-center gap-4 text-xs font-mono shrink-0">
+                    <span className="text-[#D4AF37] font-bold">{item.metrics.engagementRate}% Eng</span>
+                    <button
+                      onClick={() => setAnalysisModalItem(item)}
+                      className="px-3 py-1 rounded-xl bg-[#151618] border border-white/10 text-xs text-[#F5F4F0] hover:bg-white/5"
+                    >
+                      View
+                    </button>
                   </div>
                 </div>
               ))}
@@ -406,137 +661,27 @@ export default function AnalyticsDashboardPage() {
           )}
         </div>
 
-        {/* DETERMINISTIC BEST CONTENT INSIGHTS */}
-        <div className="glass-card p-6 rounded-3xl space-y-4 border border-white/10">
-          <div className="flex items-center gap-2 border-b border-white/10 pb-3">
-            <Sparkles className="w-4 h-4 text-[#c5a059]" />
-            <h3 className="font-serif-luxury text-lg font-bold text-[#f5f4f0]">
-              Performance Intelligence Insights
-            </h3>
-          </div>
+        {/* Content Format Analysis (1 col) */}
+        <div className="bg-[#151618] border border-white/[0.08] rounded-3xl p-6 space-y-4">
+          <h3 className="text-sm font-bold font-mono text-[#F5F4F0]">Content Format Analysis</h3>
 
-          <div className="space-y-3 pt-2">
-            {mediaItems.length === 0 ? (
-              <p className="text-xs text-[#9e9d98] italic py-8 text-center">
-                Insights will be generated after publishing and synchronizing content analytics.
-              </p>
-            ) : (
-              <>
-                <div className="p-3.5 rounded-xl bg-[#14161a] border border-white/10 space-y-1">
-                  <span className="text-[10px] font-mono uppercase font-bold text-[#c5a059]">
-                    Save Rate Leader
-                  </span>
-                  <p className="text-xs text-[#f5f4f0]">
-                    High visual quality posts generated the highest save rate in this workspace.
-                  </p>
+          <div className="space-y-3">
+            {Object.entries(formatBreakdown).map(([fmt, data]) => (
+              <div key={fmt} className="p-3.5 rounded-2xl bg-[#0B0C0E] border border-white/[0.06] space-y-1">
+                <div className="flex justify-between text-xs font-mono">
+                  <span className="font-bold text-[#F5F4F0]">{fmt}</span>
+                  <span className="text-[#D4AF37]">{data.count} published</span>
                 </div>
-                <div className="p-3.5 rounded-xl bg-[#14161a] border border-white/10 space-y-1">
-                  <span className="text-[10px] font-mono uppercase font-bold text-[#4e8765]">
-                    Audience Engagement Peak
-                  </span>
-                  <p className="text-xs text-[#f5f4f0]">
-                    Editorial campaigns with concise luxury CTAs achieved peak engagement rates.
-                  </p>
+                <div className="w-full bg-white/5 h-1.5 rounded-full overflow-hidden">
+                  <div
+                    style={{ width: `${Math.min(100, data.count * 20)}%` }}
+                    className="bg-[#D4AF37] h-full rounded-full"
+                  />
                 </div>
-              </>
-            )}
+              </div>
+            ))}
           </div>
         </div>
-      </div>
-
-      {/* CONTENT PERFORMANCE TABLE */}
-      <div className="glass-card p-6 rounded-3xl space-y-4 border border-white/10">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/10 pb-4">
-          <div>
-            <h3 className="font-serif-luxury text-xl font-bold text-[#f5f4f0]">
-              Content Performance Directory
-            </h3>
-            <p className="text-xs text-[#9e9d98]">
-              Detailed breakdown of published media metrics.
-            </p>
-          </div>
-
-          {/* Sort Selector */}
-          <div className="flex items-center gap-2 text-xs font-mono">
-            <span className="text-[#9e9d98]">Sort by:</span>
-            <select
-              value={sortBy}
-              onChange={(e) =>
-                setSortBy(
-                  e.target.value as "engagementRate" | "reach" | "saves" | "shares"
-                )
-              }
-              className="bg-[#14161a] border border-white/10 rounded-lg px-3 py-1.5 text-[#f5f4f0] focus:outline-none focus:border-[#c5a059]"
-            >
-              <option value="engagementRate">Engagement Rate</option>
-              <option value="reach">Reach</option>
-              <option value="saves">Saves</option>
-              <option value="shares">Shares</option>
-            </select>
-          </div>
-        </div>
-
-        {mediaItems.length === 0 ? (
-          <p className="text-xs text-[#9e9d98] text-center py-12">
-            No published posts found. Create and publish campaigns to see detailed metrics.
-          </p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs text-[#9e9d98]">
-              <thead className="border-b border-white/10 uppercase font-mono text-[10px] text-[#f5f4f0]">
-                <tr>
-                  <th className="py-3 px-4">Publication</th>
-                  <th className="py-3 px-4">Published</th>
-                  <th className="py-3 px-4">Reach</th>
-                  <th className="py-3 px-4">Likes</th>
-                  <th className="py-3 px-4">Comments</th>
-                  <th className="py-3 px-4">Saves</th>
-                  <th className="py-3 px-4">Shares</th>
-                  <th className="py-3 px-4 text-right">Eng. Rate</th>
-                  <th className="py-3 px-4"></th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/5">
-                {mediaItems.map((item) => (
-                  <tr
-                    key={item.publicationId}
-                    className="hover:bg-white/[0.02] transition-all group"
-                  >
-                    <td className="py-3 px-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-lg bg-[#14161a] border border-white/10 flex items-center justify-center shrink-0">
-                          <Instagram className="w-4 h-4 text-[#c5a059]" />
-                        </div>
-                        <span className="font-semibold text-[#f5f4f0] line-clamp-1 max-w-[200px]">
-                          {item.caption || "Publication"}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="py-3 px-4 font-mono text-[11px]">
-                      {new Date(item.publishedAt).toLocaleDateString()}
-                    </td>
-                    <td className="py-3 px-4 font-mono">{item.metrics.reach.toLocaleString()}</td>
-                    <td className="py-3 px-4 font-mono">{item.metrics.likes.toLocaleString()}</td>
-                    <td className="py-3 px-4 font-mono">{item.metrics.comments.toLocaleString()}</td>
-                    <td className="py-3 px-4 font-mono">{item.metrics.saves.toLocaleString()}</td>
-                    <td className="py-3 px-4 font-mono">{item.metrics.shares.toLocaleString()}</td>
-                    <td className="py-3 px-4 font-mono font-bold text-[#c5a059] text-right">
-                      {item.metrics.engagementRate}%
-                    </td>
-                    <td className="py-3 px-4 text-right">
-                      <Link
-                        href={`/analytics/media/${item.publicationId}`}
-                        className="inline-flex items-center gap-1 text-[11px] font-mono text-[#c5a059] hover:underline"
-                      >
-                        Details <ChevronRight className="w-3.5 h-3.5" />
-                      </Link>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
       </div>
     </div>
   );

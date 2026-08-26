@@ -142,9 +142,22 @@ export interface TeachingContentData {
   contentFormat?: TeachingFormat;
 }
 
+export type ContentMode =
+  | "TECH"
+  | "PRODUCT"
+  | "EDUCATION"
+  | "NEWS"
+  | "BUSINESS"
+  | "FINANCE"
+  | "FITNESS"
+  | "CREATOR"
+  | "PERSONAL_BRAND"
+  | "LIFESTYLE";
+
 export interface GeneratePlatformContentInput {
   platform: SocialPlatform;
   contentType: ContentType;
+  mode?: ContentMode;
   sourceData?: {
     affiliate?: AffiliateContentData;
     certification?: CertificationContentData;

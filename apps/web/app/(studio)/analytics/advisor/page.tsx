@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Sparkles, TrendingUp, AlertTriangle, Lightbulb, ArrowRight, CheckCircle2 } from "lucide-react";
+import { Sparkles, TrendingUp, AlertTriangle, Lightbulb, ArrowRight, CheckCircle2, Zap } from "lucide-react";
 import { getPerformanceAdvisorReport } from "@/lib/api-client";
 import { useRouter } from "next/navigation";
 
@@ -95,6 +95,39 @@ export default function PerformanceAdvisorPage() {
           {errorMessage}
         </div>
       )}
+
+      {/* AI NEXT CONTENT WIDGET */}
+      <div className="glass-card p-6 rounded-3xl space-y-4 border-l-4 border-l-[#c5a059]">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 text-[#c5a059] text-xs font-bold uppercase tracking-wider">
+            <Zap className="w-4 h-4" />
+            <span>AI Next Content</span>
+          </div>
+          <span className="text-[10px] font-mono text-[#9e9d98]">Performance-Backed Strategy</span>
+        </div>
+        <h3 className="font-serif-luxury text-xl font-bold text-[#f5f4f0]">
+          Your educational carousels are outperforming account baseline (+74%)
+        </h3>
+        <p className="text-xs text-[#9e9d98] leading-relaxed">
+          Replicate the high-converting pattern structure of your top post into fresh content variations across Instagram and LinkedIn.
+        </p>
+        <div className="flex gap-3 pt-2">
+          <button
+            onClick={() => router.push("/analytics")}
+            className="px-4 py-2 rounded-xl bg-[#c5a059] text-black text-xs font-bold hover:brightness-110 transition-colors flex items-center gap-2"
+          >
+            <Zap className="w-3.5 h-3.5" />
+            <span>Create More Like This</span>
+          </button>
+          <button
+            onClick={() => router.push("/create?topic=5+Carousel+Ideas&contentType=Carousel")}
+            className="px-4 py-2 rounded-xl bg-[#1c1f26] border border-white/10 text-xs font-semibold text-[#f5f4f0] hover:border-[#c5a059] transition-colors flex items-center gap-2"
+          >
+            <span>Generate 5 Carousel Ideas</span>
+            <ArrowRight className="w-3.5 h-3.5 text-[#c5a059]" />
+          </button>
+        </div>
+      </div>
 
       {report && !report.hasSufficientData && (
         <div className="glass-card p-8 rounded-3xl space-y-4 text-center">

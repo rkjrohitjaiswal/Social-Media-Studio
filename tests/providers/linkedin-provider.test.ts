@@ -5,7 +5,7 @@ import { socialAccountService } from "../../apps/api/src/integrations/social-eng
 import { socialPublishingService } from "../../apps/api/src/integrations/social-engine/publishing-service.js";
 import { universalAnalyticsProvider } from "../../apps/api/src/integrations/social-engine/analytics-provider.js";
 import { generateSignedOAuthState, verifyOAuthState, encryptSecret, decryptSecret } from "../../apps/api/src/utils/encryption.js";
-import type { PlatformContentData, SocialAccountData } from "../types";
+import type { PlatformContentData, SocialAccountData } from "../../apps/api/src/integrations/social-engine/types.js";
 
 vi.mock("node:dns/promises", () => ({
   lookup: vi.fn().mockResolvedValue([{ address: "93.184.216.34", family: 4 }]),

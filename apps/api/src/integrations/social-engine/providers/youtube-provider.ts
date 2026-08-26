@@ -172,6 +172,8 @@ export class YouTubeProvider implements SocialPlatformProvider {
         externalPostId: mockId,
         permalink: `https://www.youtube.com/watch?v=${mockId}`,
         publishedAt: new Date(),
+        executionMode: "SIMULATED",
+        simulationMode: true,
       };
     }
 
@@ -303,6 +305,8 @@ export class YouTubeProvider implements SocialPlatformProvider {
         externalPostId: videoId,
         permalink: `https://www.youtube.com/watch?v=${videoId}`,
         publishedAt: new Date(),
+        executionMode: "REAL",
+        simulationMode: false,
       };
     } catch (error) {
       return {

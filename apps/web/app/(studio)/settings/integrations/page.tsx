@@ -16,6 +16,8 @@ import {
 import { InstagramIcon as Instagram } from "@/components/icons/InstagramIcon";
 import { AccountState } from "@/lib/queue-types";
 
+import { getAuthHeader } from "@/lib/api-client";
+
 export default function IntegrationsSettingsPage() {
   const [account, setAccount] = useState<AccountState | null>(null);
   const [isDisconnecting, setIsDisconnecting] = useState(false);
@@ -24,7 +26,10 @@ export default function IntegrationsSettingsPage() {
     let isMounted = true;
     async function loadAccount() {
       try {
-        const res = await fetch((process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000") + "/api/integrations/instagram");
+        const authHeader = await getAuthHeader();
+        const res = await fetch((process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000") + "/api/integrations/instagram", {
+          headers: { ...authHeader },
+        });
         const json = await res.json();
         if (isMounted && json.success && json.account) {
           setAccount(json.account);
@@ -47,7 +52,11 @@ export default function IntegrationsSettingsPage() {
   const handleDisconnect = async () => {
     setIsDisconnecting(true);
     try {
-      const res = await fetch((process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000") + "/api/integrations/instagram/disconnect", { method: "POST" });
+      const authHeader = await getAuthHeader();
+      const res = await fetch((process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000") + "/api/integrations/instagram/disconnect", {
+        method: "POST",
+        headers: { ...authHeader },
+      });
       const json = await res.json();
       if (json.success) {
         setAccount(null);

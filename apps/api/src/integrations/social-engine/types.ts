@@ -141,6 +141,8 @@ export interface PublishResult {
   permalink?: string;
   errorMessage?: string;
   publishedAt?: Date;
+  executionMode?: "REAL" | "SIMULATED" | "FAILED";
+  simulationMode?: boolean;
 }
 
 export interface SocialPlatformProvider {

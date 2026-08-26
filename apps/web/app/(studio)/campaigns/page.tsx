@@ -11,7 +11,8 @@ import {
   Calendar,
   ChevronRight,
   Loader2,
-  ImageIcon
+  ImageIcon,
+  Flame,
 } from "lucide-react";
 
 interface CampaignItem {
@@ -125,7 +126,13 @@ export default function CampaignsListPage() {
                   </div>
                 )}
 
-                <div className="absolute top-3 right-3 z-10">
+                <div className="absolute top-3 right-3 z-10 flex items-center gap-2">
+                  {(camp.name.includes("Trend") || camp.description?.includes("Trend")) && (
+                    <span className="px-2.5 py-1 rounded-full bg-[#c5a059] text-black text-[10px] font-bold font-mono flex items-center gap-1">
+                      <Flame className="w-3 h-3 text-black" />
+                      <span>🔥 Trend Source</span>
+                    </span>
+                  )}
                   <span
                     className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border backdrop-blur-md ${
                       camp.status === "READY"

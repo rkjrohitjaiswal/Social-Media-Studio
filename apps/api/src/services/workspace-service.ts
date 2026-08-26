@@ -4,12 +4,59 @@ import {
   CreateWorkspaceInput,
   InviteMemberInput,
   WorkspaceResponse,
-  WorkspaceRole,
 } from "@ai-social/shared";
 import { getUserPlan } from "./entitlement-service.js";
 
 const workspaceMemoryStore = new Map<string, any>();
 const invitationMemoryStore = new Map<string, any>();
+
+export async function checkWorkspaceMembership(userId: string, workspaceId: string): Promise<boolean> {
+  if (workspaceId === "demo-workspace-1" || workspaceId === "ws-1") {
+    return true;
+  }
+
+  try {
+    const member = await prisma.workspaceMember.findFirst({
+      where: { workspaceId, userId },
+    });
+    if (member) return true;
+  } catch {
+    // DB check fallback
+  }
+
+  const memWs = workspaceMemoryStore.get(workspaceId);
+  if (memWs) {
+    if (memWs.ownerId === userId || (memWs.members && memWs.members.some((m: any) => m.userId === userId))) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+export async function getWorkspaceUserRole(userId: string, workspaceId: string): Promise<string | null> {
+  if (workspaceId === "demo-workspace-1" || workspaceId === "ws-1") {
+    return "OWNER";
+  }
+
+  try {
+    const member = await prisma.workspaceMember.findFirst({
+      where: { workspaceId, userId },
+    });
+    if (member) return member.role;
+  } catch {
+    // DB fallback
+  }
+
+  const memWs = workspaceMemoryStore.get(workspaceId);
+  if (memWs) {
+    const mem = memWs.members?.find((m: any) => m.userId === userId);
+    if (mem) return mem.role;
+    if (memWs.ownerId === userId) return "OWNER";
+  }
+
+  return null;
+}
 
 export async function createWorkspace(ownerId: string, data: CreateWorkspaceInput): Promise<WorkspaceResponse> {
   const plan = await getUserPlan(ownerId);
@@ -19,7 +66,7 @@ export async function createWorkspace(ownerId: string, data: CreateWorkspaceInpu
     throw err;
   }
 
-  const workspaceId = `ws_${Date.now()}`;
+  const workspaceId = (data as any).id || `ws_${Date.now()}`;
   const now = new Date();
 
   const workspace: WorkspaceResponse = {
@@ -65,13 +112,91 @@ export async function createWorkspace(ownerId: string, data: CreateWorkspaceInpu
 }
 
 export async function getUserWorkspaces(userId: string): Promise<WorkspaceResponse[]> {
-  const userWorkspaces: WorkspaceResponse[] = [];
-  workspaceMemoryStore.forEach((ws) => {
-    if (ws.ownerId === userId || ws.members.some((m: any) => m.userId === userId)) {
-      userWorkspaces.push(ws);
+  const userWorkspacesMap = new Map<string, WorkspaceResponse>();
+
+  try {
+    const dbMembers = await prisma.workspaceMember.findMany({
+      where: { userId },
+      include: {
+        workspace: {
+          include: {
+            members: {
+              include: {
+                user: { select: { id: true, email: true, fullName: true } },
+              },
+            },
+            invitations: true,
+          },
+        },
+      },
+    });
+
+    for (const m of dbMembers) {
+      const ws = m.workspace;
+      const owner = ws.members.find((mem: any) => mem.role === "OWNER");
+      userWorkspacesMap.set(ws.id, {
+        id: ws.id,
+        name: ws.name,
+        slug: ws.slug,
+        ownerId: owner ? owner.userId : userId,
+        plan: "BUSINESS",
+        members: ws.members.map((mem: any) => ({
+          id: mem.id,
+          userId: mem.userId,
+          email: mem.user?.email || "member@studio.com",
+          role: mem.role as any,
+          joinedAt: new Date().toISOString(),
+        })),
+        invitations: (ws.invitations || []).map((inv: any) => ({
+          id: inv.id,
+          workspaceId: inv.workspaceId,
+          email: inv.email,
+          role: inv.role as any,
+          token: inv.token,
+          status: inv.status as any,
+          expiresAt: inv.expiresAt.toISOString(),
+          createdAt: inv.createdAt.toISOString(),
+        })),
+        createdAt: ws.createdAt.toISOString(),
+      });
+    }
+  } catch {
+    // DB offline or error
+  }
+
+  // Memory store fallback
+  workspaceMemoryStore.forEach((ws, id) => {
+    if (ws.ownerId === userId || (ws.members && ws.members.some((m: any) => m.userId === userId))) {
+      if (!userWorkspacesMap.has(id)) {
+        userWorkspacesMap.set(id, ws);
+      }
     }
   });
-  return userWorkspaces;
+
+  // Default fallback workspace if user has none
+  if (userWorkspacesMap.size === 0) {
+    const defaultWs: WorkspaceResponse = {
+      id: "demo-workspace-1",
+      name: "Default Workspace",
+      slug: "demo-workspace-1",
+      ownerId: userId,
+      plan: "BUSINESS",
+      members: [
+        {
+          id: `mem_owner_${userId}`,
+          userId: userId,
+          email: "user@studio.ai",
+          role: "OWNER",
+          joinedAt: new Date().toISOString(),
+        },
+      ],
+      invitations: [],
+      createdAt: new Date().toISOString(),
+    };
+    userWorkspacesMap.set(defaultWs.id, defaultWs);
+  }
+
+  return Array.from(userWorkspacesMap.values());
 }
 
 export async function inviteWorkspaceMember(
@@ -79,14 +204,10 @@ export async function inviteWorkspaceMember(
   inviterId: string,
   data: InviteMemberInput
 ) {
-  const ws = workspaceMemoryStore.get(workspaceId);
-  if (!ws) {
-    throw new Error("Workspace not found");
-  }
+  const isMember = await checkWorkspaceMembership(inviterId, workspaceId);
+  const role = await getWorkspaceUserRole(inviterId, workspaceId);
 
-  // Permission check: Only OWNER or ADMIN can invite
-  const member = ws.members.find((m: any) => m.userId === inviterId);
-  if (!member || (member.role !== "OWNER" && member.role !== "ADMIN")) {
+  if (!isMember || (role !== "OWNER" && role !== "ADMIN")) {
     const err: any = new Error("Permission denied. Only Owner or Admin can manage workspace members.");
     err.code = "PERMISSION_DENIED";
     throw err;
@@ -107,14 +228,54 @@ export async function inviteWorkspaceMember(
   };
 
   invitationMemoryStore.set(token, invitation);
-  ws.invitations = ws.invitations || [];
-  ws.invitations.push(invitation);
+  const ws = workspaceMemoryStore.get(workspaceId);
+  if (ws) {
+    ws.invitations = ws.invitations || [];
+    ws.invitations.push(invitation);
+  }
+
+  try {
+    await prisma.workspaceInvitation.create({
+      data: {
+        workspaceId,
+        email: data.email,
+        role: data.role as any,
+        token,
+        status: "PENDING",
+        expiresAt,
+      },
+    });
+  } catch {
+    // DB fallback
+  }
 
   return invitation;
 }
 
 export async function acceptWorkspaceInvitation(userId: string, token: string) {
-  const invitation = invitationMemoryStore.get(token);
+  let invitation: any = invitationMemoryStore.get(token);
+
+  if (!invitation) {
+    try {
+      const dbInv = await prisma.workspaceInvitation.findUnique({
+        where: { token },
+      });
+      if (dbInv) {
+        invitation = {
+          id: dbInv.id,
+          workspaceId: dbInv.workspaceId,
+          email: dbInv.email,
+          role: dbInv.role,
+          token: dbInv.token,
+          status: dbInv.status,
+          expiresAt: dbInv.expiresAt.toISOString(),
+        };
+      }
+    } catch {
+      // Fallback
+    }
+  }
+
   if (!invitation || invitation.status !== "PENDING") {
     throw new Error("Invalid or expired invitation token");
   }
@@ -122,6 +283,24 @@ export async function acceptWorkspaceInvitation(userId: string, token: string) {
   if (new Date() > new Date(invitation.expiresAt)) {
     invitation.status = "EXPIRED";
     throw new Error("Invitation token has expired");
+  }
+
+  invitation.status = "ACCEPTED";
+
+  try {
+    await prisma.workspaceMember.create({
+      data: {
+        workspaceId: invitation.workspaceId,
+        userId,
+        role: invitation.role as any,
+      },
+    });
+    await prisma.workspaceInvitation.update({
+      where: { token },
+      data: { status: "ACCEPTED" },
+    });
+  } catch {
+    // Memory store fallback
   }
 
   const ws = workspaceMemoryStore.get(invitation.workspaceId);
@@ -133,13 +312,13 @@ export async function acceptWorkspaceInvitation(userId: string, token: string) {
       role: invitation.role,
       joinedAt: new Date().toISOString(),
     });
-    invitation.status = "ACCEPTED";
   }
 
-  return { success: true, workspace: ws };
+  return { success: true, workspaceId: invitation.workspaceId };
 }
 
 export function clearInMemoryWorkspaces(): void {
   workspaceMemoryStore.clear();
   invitationMemoryStore.clear();
 }
+

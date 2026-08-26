@@ -17,8 +17,8 @@ const sansFont = Plus_Jakarta_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "AI Social Media Studio — Haute Couture & Luxury Content Engine",
-  description: "Transform 1 reference aesthetic into 100 high-fashion social posts with AI visual generation, editorial copy, quality grading, and automated publishing.",
+  title: "AI Social Media Studio — AI Social Media Content Engine",
+  description: "Transform 1 reference aesthetic into 100 high-performance social posts with AI visual generation, editorial copy, quality grading, and automated publishing.",
 };
 
 export default function RootLayout({
