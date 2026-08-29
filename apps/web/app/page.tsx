@@ -149,19 +149,11 @@ export default function PublicHomepage() {
         <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
           {/* LEFT: LOGO */}
           <Link href="/" className="flex items-center gap-3 group">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#c5a059] via-[#d4af37] to-[#8a6d3b] p-[1px] flex items-center justify-center shadow-lg shadow-[#c5a059]/20 group-hover:scale-105 transition-all duration-300">
-              <div className="w-full h-full bg-[#0b0c0e] rounded-[11px] flex items-center justify-center">
-                <Sparkles className="w-5 h-5 text-[#c5a059]" />
-              </div>
-            </div>
-            <div>
-              <span className="text-lg font-bold tracking-tight text-[#f5f4f0] block leading-none font-sans">
-                AI SOCIAL <span className="text-[#c5a059] font-medium text-xs ml-1 tracking-widest uppercase">STUDIO</span>
-              </span>
-              <span className="text-[10px] text-[#9e9d98] tracking-widest uppercase block mt-1 font-mono">
-                Unified Content Platform
-              </span>
-            </div>
+            <img
+              src="/logo.jpg"
+              alt="AI Social Media Studio"
+              className="h-11 w-auto object-contain rounded-xl border border-white/[0.08] shadow-lg shadow-[#c5a059]/20 group-hover:scale-105 transition-all duration-300"
+            />
           </Link>
 
           {/* CENTER: NAV LINKS */}
@@ -890,12 +882,11 @@ export default function PublicHomepage() {
             {/* BRAND COL */}
             <div className="space-y-4">
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-[#c5a059]/10 border border-[#c5a059]/30 flex items-center justify-center">
-                  <Sparkles className="w-4 h-4 text-[#c5a059]" />
-                </div>
-                <span className="text-sm font-bold text-[#f5f4f0] tracking-tight font-sans">
-                  AI SOCIAL <span className="text-[#c5a059] font-medium text-xs">STUDIO</span>
-                </span>
+                <img
+                  src="/logo.jpg"
+                  alt="AI Social Media Studio"
+                  className="h-9 w-auto object-contain rounded-lg border border-white/10"
+                />
               </div>
               <p className="text-xs text-[#9e9d98] leading-relaxed">
                 Unified content orchestration platform. Connect your own providers and social media channels to create, edit, repurpose and publish.

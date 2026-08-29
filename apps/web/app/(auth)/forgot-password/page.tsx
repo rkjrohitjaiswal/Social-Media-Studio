@@ -62,19 +62,11 @@ export default function ForgotPasswordPage() {
         {/* LOGO BRAND HEADER */}
         <div className="relative z-20">
           <Link href="/" className="inline-flex items-center gap-3 group">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#c5a059] to-[#8a6e34] p-[1px] flex items-center justify-center shadow-xl">
-              <div className="w-full h-full bg-[#0b0c0e] rounded-[11px] flex items-center justify-center">
-                <Sparkles className="w-5 h-5 text-[#c5a059]" />
-              </div>
-            </div>
-            <div>
-              <span className="font-serif-luxury text-2xl font-bold tracking-tight text-[#f5f4f0] block leading-none">
-                STUDIO<span className="text-[#c5a059] font-sans text-xs ml-1 font-semibold tracking-widest">AI</span>
-              </span>
-              <span className="text-[10px] text-[#9e9d98] tracking-widest uppercase block mt-1">
-                Haute Social Engine
-              </span>
-            </div>
+            <img
+              src="/logo.jpg"
+              alt="AI Social Media Studio"
+              className="h-10 w-auto object-contain rounded-xl border border-white/[0.08] shadow-md shadow-[#D4AF37]/15 group-hover:scale-105 transition-all"
+            />
           </Link>
         </div>
 

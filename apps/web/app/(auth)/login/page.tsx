@@ -83,19 +83,11 @@ export default function LoginPage() {
       {/* TOP BAR: BRAND HEADER & BACK TO HOME */}
       <header className="relative z-10 w-full max-w-7xl mx-auto flex items-center justify-between">
         <Link href="/" className="flex items-center gap-3 group">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#D4AF37] via-[#C5A059] to-[#8A6D3B] p-[1px] flex items-center justify-center shadow-md shadow-[#D4AF37]/15 group-hover:scale-105 transition-all">
-            <div className="w-full h-full bg-[#0B0C0E] rounded-[11px] flex items-center justify-center">
-              <Sparkles className="w-4.5 h-4.5 text-[#D4AF37]" />
-            </div>
-          </div>
-          <div>
-            <span className="text-base font-bold tracking-tight text-[#F5F4F0] block leading-none font-sans">
-              AI SOCIAL <span className="text-[#D4AF37] font-medium text-xs ml-1 tracking-widest uppercase">STUDIO</span>
-            </span>
-            <span className="text-[10px] text-[#9E9D98] tracking-widest uppercase block mt-0.5 font-mono">
-              Unified Platform
-            </span>
-          </div>
+          <img
+            src="/logo.jpg"
+            alt="AI Social Media Studio"
+            className="h-10 w-auto object-contain rounded-xl border border-white/[0.08] shadow-md shadow-[#D4AF37]/15 group-hover:scale-105 transition-all"
+          />
         </Link>
 
         <Link

@@ -178,19 +178,21 @@ export default function StudioLayout({ children }: { children: React.ReactNode }
               className="flex items-center gap-3 group"
               title={collapsed ? "AI Social Media Studio" : undefined}
             >
-              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#D4AF37] via-[#C5A059] to-[#8A6D3B] p-[1px] flex items-center justify-center shadow-md shadow-[#D4AF37]/15 shrink-0">
-                <div className="w-full h-full bg-[#0B0C0E] rounded-[11px] flex items-center justify-center">
-                  <Sparkles className="w-4.5 h-4.5 text-[#D4AF37]" />
+              {collapsed ? (
+                <div className="w-9 h-9 rounded-xl overflow-hidden border border-[#D4AF37]/40 p-0.5 bg-[#0B0C0E] shadow-md shadow-[#D4AF37]/15 shrink-0 group-hover:scale-105 transition-all">
+                  <img
+                    src="/logo-mark.jpg"
+                    alt="AI Social Media Studio"
+                    className="w-full h-full object-contain rounded-lg"
+                  />
                 </div>
-              </div>
-              {!collapsed && (
-                <div>
-                  <span className="text-sm font-bold tracking-tight text-[#F5F4F0] block leading-none font-sans whitespace-nowrap">
-                    AI SOCIAL MEDIA
-                  </span>
-                  <span className="text-[#D4AF37] font-semibold text-xs tracking-widest uppercase block mt-0.5 font-sans whitespace-nowrap">
-                    STUDIO
-                  </span>
+              ) : (
+                <div className="h-9 flex items-center shrink-0 group-hover:scale-105 transition-all">
+                  <img
+                    src="/logo.jpg"
+                    alt="AI Social Media Studio"
+                    className="h-9 w-auto object-contain rounded-lg border border-white/[0.08]"
+                  />
                 </div>
               )}
             </Link>
