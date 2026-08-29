@@ -1,8 +1,11 @@
 {
   "extends": "@ai-social/config/tsconfig.base.json",
   "compilerOptions": {
-    "module": "ESNext",
-    "moduleResolution": "bundler"
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "outDir": "./dist",
+    "rootDir": "./src"
   },
   "include": ["src/**/*"]
 }
+

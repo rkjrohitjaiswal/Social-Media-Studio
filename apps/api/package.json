@@ -8,6 +8,7 @@
     "build": "tsc",
     "start": "node dist/server.js",
     "typecheck": "tsc --noEmit",
+    "vercel-build": "cd ../.. && npm install && npx prisma generate --schema=packages/database/prisma/schema.prisma && npm run build --workspace=@ai-social/shared && npm run build --workspace=@ai-social/database && cd apps/api && npm run build",
     "worker:generation": "tsx src/workers/generationWorker.ts",
     "worker:publishing": "tsx src/workers/publishingWorker.ts",
     "worker:analytics": "tsx src/workers/analyticsWorker.ts"
