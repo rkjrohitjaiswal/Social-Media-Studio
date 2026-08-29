@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -17,6 +17,7 @@ import {
   HelpCircle,
   User,
   ChevronDown,
+  ChevronUp,
   Bell,
   LogOut,
   Search,
@@ -41,10 +42,13 @@ export default function StudioLayout({ children }: { children: React.ReactNode }
 
   const [showWorkspaceDropdown, setShowWorkspaceDropdown] = useState(false);
   const [showUserDropdown, setShowUserDropdown] = useState(false);
+  const [showSidebarProfileMenu, setShowSidebarProfileMenu] = useState(false);
   const [showNotifDropdown, setShowNotifDropdown] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [userProfile, setUserProfile] = useState<{ name: string; email: string } | null>(null);
+
+  const sidebarProfileRef = useRef<HTMLDivElement>(null);
 
   const unreadNotifsCount = notifications.filter((n) => !n.read).length;
 
@@ -69,6 +73,31 @@ export default function StudioLayout({ children }: { children: React.ReactNode }
     }
 
     loadUserSession();
+  }, []);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (
+        sidebarProfileRef.current &&
+        !sidebarProfileRef.current.contains(event.target as Node)
+      ) {
+        setShowSidebarProfileMenu(false);
+      }
+    }
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setShowSidebarProfileMenu(false);
+        setShowWorkspaceDropdown(false);
+        setShowNotifDropdown(false);
+        setShowUserDropdown(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
   }, []);
 
   const handleSignOut = async () => {
@@ -108,13 +137,6 @@ export default function StudioLayout({ children }: { children: React.ReactNode }
       group: "CONNECT",
       items: [{ name: "Connections", href: "/settings/social-accounts", icon: LinkIcon }],
     },
-  ];
-
-  const bottomItems = [
-    { name: "Workspace", href: "/settings", icon: Building2 },
-    { name: "Settings", href: "/settings", icon: Settings },
-    { name: "Help", href: "/help", icon: HelpCircle },
-    { name: "Account", href: "/settings/profile", icon: User },
   ];
 
   const SidebarContent = () => (
@@ -235,51 +257,127 @@ export default function StudioLayout({ children }: { children: React.ReactNode }
         </nav>
       </div>
 
-      {/* BOTTOM NAV ITEMS & USER ACCOUNT */}
-      <div className="pt-3 border-t border-white/[0.08] space-y-2">
-        <div className="space-y-0.5">
-          {bottomItems.map((item) => {
-            const isActive = pathname === item.href;
-            const Icon = item.icon;
-            return (
+      {/* CLICKABLE USER PROFILE SECTION AT BOTTOM */}
+      <div className="pt-3 border-t border-white/[0.08] relative shrink-0" ref={sidebarProfileRef}>
+        {/* PROFILE POPOVER MENU */}
+        {showSidebarProfileMenu && (
+          <div className="absolute bottom-full mb-2 left-0 right-0 bg-[#151618] border border-white/[0.08] rounded-2xl shadow-2xl z-50 overflow-hidden py-1 animate-in fade-in slide-in-from-bottom-2 duration-150">
+            {/* HEADER WITH AVATAR / NAME / EMAIL */}
+            <div className="px-3 py-2.5 border-b border-white/[0.08] flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl bg-[#D4AF37]/20 border border-[#D4AF37]/40 text-[#D4AF37] font-bold flex items-center justify-center text-xs shrink-0">
+                {userProfile?.name ? userProfile.name.charAt(0).toUpperCase() : "A"}
+              </div>
+              <div className="truncate">
+                <div className="text-xs font-semibold text-[#F5F4F0] truncate">
+                  {userProfile?.name || "Alex"}
+                </div>
+                <div className="text-[10px] text-[#9E9D98] truncate">
+                  {userProfile?.email || "alex@studio.io"}
+                </div>
+              </div>
+            </div>
+
+            {/* MENU ITEMS */}
+            <div className="py-1">
               <Link
-                key={item.name}
-                href={item.href}
-                onClick={() => setIsMobileMenuOpen(false)}
-                className={`flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                  isActive
+                href="/settings"
+                onClick={() => {
+                  setShowSidebarProfileMenu(false);
+                  setIsMobileMenuOpen(false);
+                }}
+                className={`flex items-center gap-2.5 px-3 py-2 text-xs font-medium transition-all ${
+                  pathname === "/settings"
                     ? "bg-[#D4AF37]/15 text-[#D4AF37]"
-                    : "text-[#9E9D98] hover:text-[#F5F4F0] hover:bg-white/5"
+                    : "text-[#9E9D98] hover:text-[#D4AF37] hover:bg-[#D4AF37]/10"
                 }`}
               >
-                <Icon className="w-3.5 h-3.5" />
-                <span>{item.name}</span>
+                <Building2 className="w-4 h-4 text-[#D4AF37]" />
+                <span>Workspace</span>
               </Link>
-            );
-          })}
-        </div>
+              <Link
+                href="/settings"
+                onClick={() => {
+                  setShowSidebarProfileMenu(false);
+                  setIsMobileMenuOpen(false);
+                }}
+                className={`flex items-center gap-2.5 px-3 py-2 text-xs font-medium transition-all ${
+                  pathname === "/settings"
+                    ? "bg-[#D4AF37]/15 text-[#D4AF37]"
+                    : "text-[#9E9D98] hover:text-[#D4AF37] hover:bg-[#D4AF37]/10"
+                }`}
+              >
+                <Settings className="w-4 h-4 text-[#D4AF37]" />
+                <span>Settings</span>
+              </Link>
+              <Link
+                href="/help"
+                onClick={() => {
+                  setShowSidebarProfileMenu(false);
+                  setIsMobileMenuOpen(false);
+                }}
+                className={`flex items-center gap-2.5 px-3 py-2 text-xs font-medium transition-all ${
+                  pathname === "/help"
+                    ? "bg-[#D4AF37]/15 text-[#D4AF37]"
+                    : "text-[#9E9D98] hover:text-[#D4AF37] hover:bg-[#D4AF37]/10"
+                }`}
+              >
+                <HelpCircle className="w-4 h-4 text-[#D4AF37]" />
+                <span>Help</span>
+              </Link>
+              <Link
+                href="/settings/profile"
+                onClick={() => {
+                  setShowSidebarProfileMenu(false);
+                  setIsMobileMenuOpen(false);
+                }}
+                className={`flex items-center gap-2.5 px-3 py-2 text-xs font-medium transition-all ${
+                  pathname === "/settings/profile"
+                    ? "bg-[#D4AF37]/15 text-[#D4AF37]"
+                    : "text-[#9E9D98] hover:text-[#D4AF37] hover:bg-[#D4AF37]/10"
+                }`}
+              >
+                <User className="w-4 h-4 text-[#D4AF37]" />
+                <span>Account</span>
+              </Link>
+              <button
+                onClick={() => {
+                  setShowSidebarProfileMenu(false);
+                  handleSignOut();
+                }}
+                className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-colors border-t border-white/[0.08] mt-1"
+              >
+                <LogOut className="w-4 h-4 text-red-400" />
+                <span>Sign Out</span>
+              </button>
+            </div>
+          </div>
+        )}
 
-        {/* ACCOUNT ITEM FOOTER */}
-        <div className="pt-2 border-t border-white/[0.08] flex items-center justify-between px-2">
+        {/* CLICKABLE PROFILE TRIGGER BUTTON */}
+        <button
+          type="button"
+          onClick={() => setShowSidebarProfileMenu(!showSidebarProfileMenu)}
+          className="w-full flex items-center justify-between p-2 rounded-xl bg-[#151618] border border-white/[0.08] hover:border-[#D4AF37]/40 hover:bg-white/5 transition-all text-left group"
+        >
           <div className="flex items-center gap-2.5 truncate">
-            <div className="w-7 h-7 rounded-lg bg-[#D4AF37]/20 border border-[#D4AF37]/40 text-[#D4AF37] font-bold flex items-center justify-center text-xs shrink-0">
+            <div className="w-8 h-8 rounded-xl bg-[#D4AF37]/20 border border-[#D4AF37]/40 text-[#D4AF37] font-bold flex items-center justify-center text-xs shrink-0 group-hover:border-[#D4AF37]">
               {userProfile?.name ? userProfile.name.charAt(0).toUpperCase() : "A"}
             </div>
             <div className="truncate">
-              <div className="text-xs font-medium text-[#F5F4F0] truncate">
+              <div className="text-xs font-semibold text-[#F5F4F0] truncate group-hover:text-[#D4AF37] transition-colors">
                 {userProfile?.name || "Alex"}
               </div>
-              <div className="text-[10px] text-[#9E9D98] truncate">{userProfile?.email}</div>
+              <div className="text-[10px] text-[#9E9D98] truncate">
+                {userProfile?.email || "alex@studio.io"}
+              </div>
             </div>
           </div>
-          <button
-            onClick={handleSignOut}
-            className="text-[#9E9D98] hover:text-red-400 transition-colors p-1"
-            title="Sign Out"
-          >
-            <LogOut className="w-3.5 h-3.5" />
-          </button>
-        </div>
+          <ChevronUp
+            className={`w-4 h-4 text-[#9E9D98] shrink-0 transition-transform ${
+              showSidebarProfileMenu ? "rotate-180 text-[#D4AF37]" : "group-hover:text-[#F5F4F0]"
+            }`}
+          />
+        </button>
       </div>
     </div>
   );
