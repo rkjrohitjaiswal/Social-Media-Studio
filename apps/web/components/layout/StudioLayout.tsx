@@ -18,6 +18,8 @@ import {
   User,
   ChevronDown,
   ChevronUp,
+  ChevronLeft,
+  ChevronRight,
   Bell,
   LogOut,
   Search,
@@ -46,11 +48,31 @@ export default function StudioLayout({ children }: { children: React.ReactNode }
   const [showNotifDropdown, setShowNotifDropdown] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(false);
   const [userProfile, setUserProfile] = useState<{ name: string; email: string } | null>(null);
 
   const sidebarProfileRef = useRef<HTMLDivElement>(null);
 
   const unreadNotifsCount = notifications.filter((n) => !n.read).length;
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("sidebar_collapsed");
+      if (saved === "true") {
+        setIsCollapsed(true);
+      }
+    }
+  }, []);
+
+  const toggleSidebar = () => {
+    setIsCollapsed((prev) => {
+      const next = !prev;
+      if (typeof window !== "undefined") {
+        localStorage.setItem("sidebar_collapsed", String(next));
+      }
+      return next;
+    });
+  };
 
   useEffect(() => {
     async function loadUserSession() {
@@ -139,248 +161,314 @@ export default function StudioLayout({ children }: { children: React.ReactNode }
     },
   ];
 
-  const SidebarContent = () => (
-    <div className="h-full flex flex-col justify-between p-4 selection:bg-[#D4AF37]/30 overflow-hidden">
-      <div className="flex-1 flex flex-col min-h-0 space-y-3">
-        {/* LOGO HEADER */}
-        <div className="p-2 border-b border-white/[0.08] flex items-center justify-between shrink-0">
-          <Link href="/dashboard" className="flex items-center gap-3 group">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#D4AF37] via-[#C5A059] to-[#8A6D3B] p-[1px] flex items-center justify-center shadow-md shadow-[#D4AF37]/15">
-              <div className="w-full h-full bg-[#0B0C0E] rounded-[11px] flex items-center justify-center">
-                <Sparkles className="w-4.5 h-4.5 text-[#D4AF37]" />
-              </div>
-            </div>
-            <div>
-              <span className="text-sm font-bold tracking-tight text-[#F5F4F0] block leading-none font-sans">
-                AI SOCIAL MEDIA
-              </span>
-              <span className="text-[#D4AF37] font-semibold text-xs tracking-widest uppercase block mt-0.5 font-sans">
-                STUDIO
-              </span>
-            </div>
-          </Link>
-          {isMobileMenuOpen && (
-            <button
-              onClick={() => setIsMobileMenuOpen(false)}
-              className="md:hidden text-[#9E9D98] hover:text-[#F5F4F0] p-1"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          )}
-        </div>
+  const SidebarContent = ({ isMobile = false }: { isMobile?: boolean }) => {
+    const collapsed = isMobile ? false : isCollapsed;
 
-        {/* WORKSPACE SELECTOR DROPDOWN */}
-        <div className="relative shrink-0">
-          <button
-            onClick={() => setShowWorkspaceDropdown(!showWorkspaceDropdown)}
-            className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl bg-[#151618] border border-white/[0.08] hover:border-[#D4AF37]/40 transition-colors text-left"
+    return (
+      <div className="h-full flex flex-col justify-between p-4 selection:bg-[#D4AF37]/30 overflow-hidden">
+        <div className="flex-1 flex flex-col min-h-0 space-y-3">
+          {/* LOGO HEADER */}
+          <div
+            className={`p-2 border-b border-white/[0.08] flex items-center shrink-0 ${
+              collapsed ? "flex-col gap-2 justify-center" : "justify-between"
+            }`}
           >
-            <div className="flex items-center gap-2.5 truncate">
-              <Building2 className="w-4 h-4 text-[#D4AF37] shrink-0" />
-              <span className="text-xs font-semibold text-[#F5F4F0] truncate">
-                {activeWorkspace?.name || "My Workspace"}
-              </span>
-            </div>
-            <ChevronDown className="w-3.5 h-3.5 text-[#9E9D98] shrink-0" />
-          </button>
+            <Link
+              href="/dashboard"
+              className="flex items-center gap-3 group"
+              title={collapsed ? "AI Social Media Studio" : undefined}
+            >
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#D4AF37] via-[#C5A059] to-[#8A6D3B] p-[1px] flex items-center justify-center shadow-md shadow-[#D4AF37]/15 shrink-0">
+                <div className="w-full h-full bg-[#0B0C0E] rounded-[11px] flex items-center justify-center">
+                  <Sparkles className="w-4.5 h-4.5 text-[#D4AF37]" />
+                </div>
+              </div>
+              {!collapsed && (
+                <div>
+                  <span className="text-sm font-bold tracking-tight text-[#F5F4F0] block leading-none font-sans whitespace-nowrap">
+                    AI SOCIAL MEDIA
+                  </span>
+                  <span className="text-[#D4AF37] font-semibold text-xs tracking-widest uppercase block mt-0.5 font-sans whitespace-nowrap">
+                    STUDIO
+                  </span>
+                </div>
+              )}
+            </Link>
 
-          {showWorkspaceDropdown && (
-            <div className="absolute top-full left-0 right-0 mt-2 bg-[#151618] border border-white/[0.08] rounded-xl shadow-2xl z-50 overflow-hidden py-1">
-              {workspaces.map((ws) => (
-                <button
-                  key={ws.id}
-                  onClick={() => {
-                    setActiveWorkspace(ws);
-                    setShowWorkspaceDropdown(false);
-                    router.refresh();
-                  }}
-                  className={`w-full flex items-center gap-2.5 px-3 py-2 text-xs text-left hover:bg-white/5 transition-colors ${
-                    ws.id === activeWorkspace?.id ? "bg-[#D4AF37]/10 text-[#D4AF37] font-medium" : "text-[#F5F4F0]"
-                  }`}
-                >
-                  <Building2 className="w-3.5 h-3.5 text-[#9E9D98] shrink-0" />
-                  <span className="truncate">{ws.name}</span>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+            {/* DESKTOP COLLAPSE TOGGLE BUTTON */}
+            {!isMobile && (
+              <button
+                type="button"
+                onClick={toggleSidebar}
+                className="hidden md:flex items-center justify-center p-1.5 rounded-lg text-[#9E9D98] hover:text-[#D4AF37] hover:bg-white/5 border border-white/[0.08] transition-colors"
+                title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+              >
+                {collapsed ? (
+                  <ChevronRight className="w-4 h-4" />
+                ) : (
+                  <ChevronLeft className="w-4 h-4" />
+                )}
+              </button>
+            )}
 
-        {/* PRIMARY CTA: + CREATE */}
-        <Link
-          href="/create"
-          onClick={() => setIsMobileMenuOpen(false)}
-          className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-[#D4AF37] to-[#C5A059] text-[#0B0C0E] font-semibold text-xs shadow-md shadow-[#D4AF37]/10 hover:opacity-95 transition-all flex items-center justify-center gap-2 shrink-0"
-        >
-          <PlusCircle className="w-4 h-4 text-[#0B0C0E]" />
-          <span>+ Create</span>
-        </Link>
+            {/* MOBILE CLOSE BUTTON */}
+            {isMobile && isMobileMenuOpen && (
+              <button
+                type="button"
+                onClick={() => setIsMobileMenuOpen(false)}
+                className="md:hidden text-[#9E9D98] hover:text-[#F5F4F0] p-1"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            )}
+          </div>
 
-        {/* NAVIGATION SECTIONS */}
-        <nav className="flex-1 overflow-y-auto space-y-3 pt-1 pr-1 min-h-0">
-          {navSections.map((section) => (
-            <div key={section.group} className="space-y-0.5">
-              <span className="text-[10px] font-mono font-bold text-[#9E9D98]/70 tracking-widest uppercase block px-3 py-1">
-                {section.group}
-              </span>
-              {section.items.map((item) => {
-                const isActive =
-                  item.href === "/dashboard"
-                    ? pathname === "/dashboard"
-                    : pathname?.startsWith(item.href);
-                const Icon = item.icon;
+          {/* WORKSPACE SELECTOR DROPDOWN */}
+          <div className="relative shrink-0">
+            <button
+              type="button"
+              onClick={() => setShowWorkspaceDropdown(!showWorkspaceDropdown)}
+              title={collapsed ? activeWorkspace?.name || "My Workspace" : undefined}
+              className={`w-full flex items-center rounded-xl bg-[#151618] border border-white/[0.08] hover:border-[#D4AF37]/40 transition-colors text-left ${
+                collapsed ? "justify-center p-2.5" : "justify-between px-3 py-2.5"
+              }`}
+            >
+              <div className="flex items-center gap-2.5 truncate">
+                <Building2 className="w-4 h-4 text-[#D4AF37] shrink-0" />
+                {!collapsed && (
+                  <span className="text-xs font-semibold text-[#F5F4F0] truncate">
+                    {activeWorkspace?.name || "My Workspace"}
+                  </span>
+                )}
+              </div>
+              {!collapsed && <ChevronDown className="w-3.5 h-3.5 text-[#9E9D98] shrink-0" />}
+            </button>
 
-                return (
-                  <Link
-                    key={item.name}
-                    href={item.href}
-                    onClick={() => setIsMobileMenuOpen(false)}
-                    className={`flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-all group ${
-                      isActive
-                        ? "bg-[#D4AF37]/15 text-[#D4AF37] border border-[#D4AF37]/30"
-                        : "text-[#9E9D98] hover:text-[#F5F4F0] hover:bg-white/5"
+            {showWorkspaceDropdown && (
+              <div
+                className={`absolute top-full mt-2 bg-[#151618] border border-white/[0.08] rounded-xl shadow-2xl z-50 overflow-hidden py-1 ${
+                  collapsed ? "left-0 w-56" : "left-0 right-0"
+                }`}
+              >
+                {workspaces.map((ws) => (
+                  <button
+                    key={ws.id}
+                    type="button"
+                    onClick={() => {
+                      setActiveWorkspace(ws);
+                      setShowWorkspaceDropdown(false);
+                      router.refresh();
+                    }}
+                    className={`w-full flex items-center gap-2.5 px-3 py-2 text-xs text-left hover:bg-white/5 transition-colors ${
+                      ws.id === activeWorkspace?.id
+                        ? "bg-[#D4AF37]/10 text-[#D4AF37] font-medium"
+                        : "text-[#F5F4F0]"
                     }`}
                   >
-                    <div className="flex items-center gap-2.5">
-                      <Icon
-                        className={`w-4 h-4 ${
-                          isActive ? "text-[#D4AF37]" : "text-[#9E9D98] group-hover:text-[#F5F4F0]"
-                        }`}
-                      />
-                      <span>{item.name}</span>
-                    </div>
-                  </Link>
-                );
-              })}
-            </div>
-          ))}
-        </nav>
-      </div>
+                    <Building2 className="w-3.5 h-3.5 text-[#9E9D98] shrink-0" />
+                    <span className="truncate">{ws.name}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
 
-      {/* CLICKABLE USER PROFILE SECTION AT BOTTOM */}
-      <div className="pt-3 border-t border-white/[0.08] relative shrink-0" ref={sidebarProfileRef}>
-        {/* PROFILE POPOVER MENU */}
-        {showSidebarProfileMenu && (
-          <div className="absolute bottom-full mb-2 left-0 right-0 bg-[#151618] border border-white/[0.08] rounded-2xl shadow-2xl z-50 overflow-hidden py-1 animate-in fade-in slide-in-from-bottom-2 duration-150">
-            {/* HEADER WITH AVATAR / NAME / EMAIL */}
-            <div className="px-3 py-2.5 border-b border-white/[0.08] flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-xl bg-[#D4AF37]/20 border border-[#D4AF37]/40 text-[#D4AF37] font-bold flex items-center justify-center text-xs shrink-0">
+          {/* PRIMARY CTA: + CREATE */}
+          <Link
+            href="/create"
+            onClick={() => setIsMobileMenuOpen(false)}
+            title={collapsed ? "Create Content" : undefined}
+            className={`w-full py-2.5 rounded-xl bg-gradient-to-r from-[#D4AF37] to-[#C5A059] text-[#0B0C0E] font-semibold text-xs shadow-md shadow-[#D4AF37]/10 hover:opacity-95 transition-all flex items-center justify-center gap-2 shrink-0 ${
+              collapsed ? "px-0" : "px-4"
+            }`}
+          >
+            <PlusCircle className="w-4 h-4 text-[#0B0C0E] shrink-0" />
+            {!collapsed && <span>+ Create</span>}
+          </Link>
+
+          {/* NAVIGATION SECTIONS */}
+          <nav className="flex-1 overflow-y-auto space-y-3 pt-1 pr-1 min-h-0">
+            {navSections.map((section) => (
+              <div key={section.group} className="space-y-0.5">
+                {!collapsed && (
+                  <span className="text-[10px] font-mono font-bold text-[#9E9D98]/70 tracking-widest uppercase block px-3 py-1">
+                    {section.group}
+                  </span>
+                )}
+                {section.items.map((item) => {
+                  const isActive =
+                    item.href === "/dashboard"
+                      ? pathname === "/dashboard"
+                      : pathname?.startsWith(item.href);
+                  const Icon = item.icon;
+
+                  return (
+                    <Link
+                      key={item.name}
+                      href={item.href}
+                      title={collapsed ? item.name : undefined}
+                      onClick={() => setIsMobileMenuOpen(false)}
+                      className={`flex items-center rounded-xl text-xs font-medium transition-all group ${
+                        collapsed ? "justify-center px-0 py-2.5" : "justify-between px-3 py-2"
+                      } ${
+                        isActive
+                          ? "bg-[#D4AF37]/15 text-[#D4AF37] border border-[#D4AF37]/30"
+                          : "text-[#9E9D98] hover:text-[#F5F4F0] hover:bg-white/5"
+                      }`}
+                    >
+                      <div className={`flex items-center ${collapsed ? "justify-center" : "gap-2.5"}`}>
+                        <Icon
+                          className={`w-4 h-4 ${
+                            isActive ? "text-[#D4AF37]" : "text-[#9E9D98] group-hover:text-[#F5F4F0]"
+                          }`}
+                        />
+                        {!collapsed && <span>{item.name}</span>}
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+            ))}
+          </nav>
+        </div>
+
+        {/* CLICKABLE USER PROFILE SECTION AT BOTTOM */}
+        <div className="pt-3 border-t border-white/[0.08] relative shrink-0" ref={sidebarProfileRef}>
+          {/* PROFILE POPOVER MENU */}
+          {showSidebarProfileMenu && (
+            <div
+              className={`absolute bottom-full mb-2 bg-[#151618] border border-white/[0.08] rounded-2xl shadow-2xl z-50 overflow-hidden py-1 animate-in fade-in slide-in-from-bottom-2 duration-150 ${
+                collapsed ? "left-0 w-64" : "left-0 right-0"
+              }`}
+            >
+              {/* HEADER WITH AVATAR / NAME / EMAIL */}
+              <div className="px-3 py-2.5 border-b border-white/[0.08] flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-[#D4AF37]/20 border border-[#D4AF37]/40 text-[#D4AF37] font-bold flex items-center justify-center text-xs shrink-0">
+                  {userProfile?.name ? userProfile.name.charAt(0).toUpperCase() : "A"}
+                </div>
+                <div className="truncate">
+                  <div className="text-xs font-semibold text-[#F5F4F0] truncate">
+                    {userProfile?.name || "Alex"}
+                  </div>
+                  <div className="text-[10px] text-[#9E9D98] truncate">
+                    {userProfile?.email || "alex@studio.io"}
+                  </div>
+                </div>
+              </div>
+
+              {/* MENU ITEMS */}
+              <div className="py-1">
+                <Link
+                  href="/settings"
+                  onClick={() => {
+                    setShowSidebarProfileMenu(false);
+                    setIsMobileMenuOpen(false);
+                  }}
+                  className={`flex items-center gap-2.5 px-3 py-2 text-xs font-medium transition-all ${
+                    pathname === "/settings"
+                      ? "bg-[#D4AF37]/15 text-[#D4AF37]"
+                      : "text-[#9E9D98] hover:text-[#D4AF37] hover:bg-[#D4AF37]/10"
+                  }`}
+                >
+                  <Building2 className="w-4 h-4 text-[#D4AF37]" />
+                  <span>Workspace</span>
+                </Link>
+                <Link
+                  href="/settings"
+                  onClick={() => {
+                    setShowSidebarProfileMenu(false);
+                    setIsMobileMenuOpen(false);
+                  }}
+                  className={`flex items-center gap-2.5 px-3 py-2 text-xs font-medium transition-all ${
+                    pathname === "/settings"
+                      ? "bg-[#D4AF37]/15 text-[#D4AF37]"
+                      : "text-[#9E9D98] hover:text-[#D4AF37] hover:bg-[#D4AF37]/10"
+                  }`}
+                >
+                  <Settings className="w-4 h-4 text-[#D4AF37]" />
+                  <span>Settings</span>
+                </Link>
+                <Link
+                  href="/help"
+                  onClick={() => {
+                    setShowSidebarProfileMenu(false);
+                    setIsMobileMenuOpen(false);
+                  }}
+                  className={`flex items-center gap-2.5 px-3 py-2 text-xs font-medium transition-all ${
+                    pathname === "/help"
+                      ? "bg-[#D4AF37]/15 text-[#D4AF37]"
+                      : "text-[#9E9D98] hover:text-[#D4AF37] hover:bg-[#D4AF37]/10"
+                  }`}
+                >
+                  <HelpCircle className="w-4 h-4 text-[#D4AF37]" />
+                  <span>Help</span>
+                </Link>
+                <Link
+                  href="/settings/profile"
+                  onClick={() => {
+                    setShowSidebarProfileMenu(false);
+                    setIsMobileMenuOpen(false);
+                  }}
+                  className={`flex items-center gap-2.5 px-3 py-2 text-xs font-medium transition-all ${
+                    pathname === "/settings/profile"
+                      ? "bg-[#D4AF37]/15 text-[#D4AF37]"
+                      : "text-[#9E9D98] hover:text-[#D4AF37] hover:bg-[#D4AF37]/10"
+                  }`}
+                >
+                  <User className="w-4 h-4 text-[#D4AF37]" />
+                  <span>Account</span>
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowSidebarProfileMenu(false);
+                    handleSignOut();
+                  }}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-colors border-t border-white/[0.08] mt-1"
+                >
+                  <LogOut className="w-4 h-4 text-red-400" />
+                  <span>Sign Out</span>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* CLICKABLE PROFILE TRIGGER BUTTON */}
+          <button
+            type="button"
+            onClick={() => setShowSidebarProfileMenu(!showSidebarProfileMenu)}
+            title={collapsed ? userProfile?.name || "Account Profile" : undefined}
+            className={`w-full flex items-center rounded-xl bg-[#151618] border border-white/[0.08] hover:border-[#D4AF37]/40 hover:bg-white/5 transition-all text-left group ${
+              collapsed ? "justify-center p-1.5" : "justify-between p-2"
+            }`}
+          >
+            <div className="flex items-center gap-2.5 truncate">
+              <div className="w-8 h-8 rounded-xl bg-[#D4AF37]/20 border border-[#D4AF37]/40 text-[#D4AF37] font-bold flex items-center justify-center text-xs shrink-0 group-hover:border-[#D4AF37]">
                 {userProfile?.name ? userProfile.name.charAt(0).toUpperCase() : "A"}
               </div>
-              <div className="truncate">
-                <div className="text-xs font-semibold text-[#F5F4F0] truncate">
-                  {userProfile?.name || "Alex"}
+              {!collapsed && (
+                <div className="truncate">
+                  <div className="text-xs font-semibold text-[#F5F4F0] truncate group-hover:text-[#D4AF37] transition-colors">
+                    {userProfile?.name || "Alex"}
+                  </div>
+                  <div className="text-[10px] text-[#9E9D98] truncate">
+                    {userProfile?.email || "alex@studio.io"}
+                  </div>
                 </div>
-                <div className="text-[10px] text-[#9E9D98] truncate">
-                  {userProfile?.email || "alex@studio.io"}
-                </div>
-              </div>
+              )}
             </div>
-
-            {/* MENU ITEMS */}
-            <div className="py-1">
-              <Link
-                href="/settings"
-                onClick={() => {
-                  setShowSidebarProfileMenu(false);
-                  setIsMobileMenuOpen(false);
-                }}
-                className={`flex items-center gap-2.5 px-3 py-2 text-xs font-medium transition-all ${
-                  pathname === "/settings"
-                    ? "bg-[#D4AF37]/15 text-[#D4AF37]"
-                    : "text-[#9E9D98] hover:text-[#D4AF37] hover:bg-[#D4AF37]/10"
+            {!collapsed && (
+              <ChevronUp
+                className={`w-4 h-4 text-[#9E9D98] shrink-0 transition-transform ${
+                  showSidebarProfileMenu ? "rotate-180 text-[#D4AF37]" : "group-hover:text-[#F5F4F0]"
                 }`}
-              >
-                <Building2 className="w-4 h-4 text-[#D4AF37]" />
-                <span>Workspace</span>
-              </Link>
-              <Link
-                href="/settings"
-                onClick={() => {
-                  setShowSidebarProfileMenu(false);
-                  setIsMobileMenuOpen(false);
-                }}
-                className={`flex items-center gap-2.5 px-3 py-2 text-xs font-medium transition-all ${
-                  pathname === "/settings"
-                    ? "bg-[#D4AF37]/15 text-[#D4AF37]"
-                    : "text-[#9E9D98] hover:text-[#D4AF37] hover:bg-[#D4AF37]/10"
-                }`}
-              >
-                <Settings className="w-4 h-4 text-[#D4AF37]" />
-                <span>Settings</span>
-              </Link>
-              <Link
-                href="/help"
-                onClick={() => {
-                  setShowSidebarProfileMenu(false);
-                  setIsMobileMenuOpen(false);
-                }}
-                className={`flex items-center gap-2.5 px-3 py-2 text-xs font-medium transition-all ${
-                  pathname === "/help"
-                    ? "bg-[#D4AF37]/15 text-[#D4AF37]"
-                    : "text-[#9E9D98] hover:text-[#D4AF37] hover:bg-[#D4AF37]/10"
-                }`}
-              >
-                <HelpCircle className="w-4 h-4 text-[#D4AF37]" />
-                <span>Help</span>
-              </Link>
-              <Link
-                href="/settings/profile"
-                onClick={() => {
-                  setShowSidebarProfileMenu(false);
-                  setIsMobileMenuOpen(false);
-                }}
-                className={`flex items-center gap-2.5 px-3 py-2 text-xs font-medium transition-all ${
-                  pathname === "/settings/profile"
-                    ? "bg-[#D4AF37]/15 text-[#D4AF37]"
-                    : "text-[#9E9D98] hover:text-[#D4AF37] hover:bg-[#D4AF37]/10"
-                }`}
-              >
-                <User className="w-4 h-4 text-[#D4AF37]" />
-                <span>Account</span>
-              </Link>
-              <button
-                onClick={() => {
-                  setShowSidebarProfileMenu(false);
-                  handleSignOut();
-                }}
-                className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-colors border-t border-white/[0.08] mt-1"
-              >
-                <LogOut className="w-4 h-4 text-red-400" />
-                <span>Sign Out</span>
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* CLICKABLE PROFILE TRIGGER BUTTON */}
-        <button
-          type="button"
-          onClick={() => setShowSidebarProfileMenu(!showSidebarProfileMenu)}
-          className="w-full flex items-center justify-between p-2 rounded-xl bg-[#151618] border border-white/[0.08] hover:border-[#D4AF37]/40 hover:bg-white/5 transition-all text-left group"
-        >
-          <div className="flex items-center gap-2.5 truncate">
-            <div className="w-8 h-8 rounded-xl bg-[#D4AF37]/20 border border-[#D4AF37]/40 text-[#D4AF37] font-bold flex items-center justify-center text-xs shrink-0 group-hover:border-[#D4AF37]">
-              {userProfile?.name ? userProfile.name.charAt(0).toUpperCase() : "A"}
-            </div>
-            <div className="truncate">
-              <div className="text-xs font-semibold text-[#F5F4F0] truncate group-hover:text-[#D4AF37] transition-colors">
-                {userProfile?.name || "Alex"}
-              </div>
-              <div className="text-[10px] text-[#9E9D98] truncate">
-                {userProfile?.email || "alex@studio.io"}
-              </div>
-            </div>
-          </div>
-          <ChevronUp
-            className={`w-4 h-4 text-[#9E9D98] shrink-0 transition-transform ${
-              showSidebarProfileMenu ? "rotate-180 text-[#D4AF37]" : "group-hover:text-[#F5F4F0]"
-            }`}
-          />
-        </button>
+              />
+            )}
+          </button>
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   return (
     <div className="flex min-h-screen bg-[#0B0C0E] text-[#F5F4F0] selection:bg-[#D4AF37]/30">
@@ -388,7 +476,11 @@ export default function StudioLayout({ children }: { children: React.ReactNode }
       <GlobalSearchModal isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
 
       {/* DESKTOP PERSISTENT SIDEBAR */}
-      <aside className="w-64 shrink-0 border-r border-white/[0.08] bg-[#151618] flex flex-col justify-between hidden md:flex z-30 h-screen sticky top-0">
+      <aside
+        className={`${
+          isCollapsed ? "w-20" : "w-64"
+        } shrink-0 border-r border-white/[0.08] bg-[#151618] flex flex-col justify-between hidden md:flex z-30 h-screen sticky top-0 transition-[width] duration-300 ease-in-out`}
+      >
         <SidebarContent />
       </aside>
 
@@ -400,7 +492,7 @@ export default function StudioLayout({ children }: { children: React.ReactNode }
             onClick={() => setIsMobileMenuOpen(false)}
           />
           <div className="relative w-72 bg-[#151618] border-r border-white/[0.08] h-full z-10">
-            <SidebarContent />
+            <SidebarContent isMobile />
           </div>
         </div>
       )}
@@ -412,6 +504,7 @@ export default function StudioLayout({ children }: { children: React.ReactNode }
           <div className="flex items-center gap-3">
             {/* MOBILE HAMBURGER TOGGLE */}
             <button
+              type="button"
               onClick={() => setIsMobileMenuOpen(true)}
               className="md:hidden text-[#9E9D98] hover:text-[#F5F4F0] p-1.5 rounded-lg border border-white/[0.08]"
               aria-label="Open navigation menu"
@@ -421,6 +514,7 @@ export default function StudioLayout({ children }: { children: React.ReactNode }
 
             {/* SEARCH BUTTON */}
             <button
+              type="button"
               onClick={() => setIsSearchOpen(true)}
               className="w-48 sm:w-64 bg-[#0B0C0E] border border-white/[0.08] text-xs text-[#9E9D98] rounded-xl pl-9 pr-3 py-2 flex items-center justify-between hover:border-[#D4AF37]/40 transition-colors text-left relative"
             >
@@ -436,6 +530,7 @@ export default function StudioLayout({ children }: { children: React.ReactNode }
             {/* NOTIFICATION BELL */}
             <div className="relative">
               <button
+                type="button"
                 onClick={() => setShowNotifDropdown(!showNotifDropdown)}
                 className="p-2 rounded-xl bg-[#0B0C0E] border border-white/[0.08] hover:border-[#D4AF37]/40 text-[#F5F4F0] transition-colors relative"
                 aria-label="Notifications"
@@ -454,6 +549,7 @@ export default function StudioLayout({ children }: { children: React.ReactNode }
                     <span className="text-xs font-bold text-[#F5F4F0]">Notifications</span>
                     {unreadNotifsCount > 0 && (
                       <button
+                        type="button"
                         onClick={markNotificationsRead}
                         className="text-[10px] text-[#D4AF37] hover:underline font-mono"
                       >
@@ -489,6 +585,7 @@ export default function StudioLayout({ children }: { children: React.ReactNode }
             {/* USER PROFILE DROPDOWN */}
             <div className="relative">
               <button
+                type="button"
                 onClick={() => setShowUserDropdown(!showUserDropdown)}
                 className="flex items-center gap-2 p-1.5 rounded-xl bg-[#0B0C0E] border border-white/[0.08] hover:border-[#D4AF37]/40 transition-colors"
               >
@@ -522,6 +619,7 @@ export default function StudioLayout({ children }: { children: React.ReactNode }
                     Workspace Settings
                   </Link>
                   <button
+                    type="button"
                     onClick={handleSignOut}
                     className="w-full text-left px-3 py-2 text-xs text-red-400 hover:bg-red-500/10 border-t border-white/[0.08]"
                   >
@@ -539,4 +637,5 @@ export default function StudioLayout({ children }: { children: React.ReactNode }
     </div>
   );
 }
+
 
