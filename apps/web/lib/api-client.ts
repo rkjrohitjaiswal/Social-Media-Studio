@@ -284,3 +284,51 @@ export async function getAuthHeader(): Promise<Record<string, string>> {
     "x-workspace-id": getActiveWorkspaceId(),
   };
 }
+
+/**
+ * Upload a reference-style image file to the backend.
+ * The backend handles secure storage via Supabase Storage (service-role key
+ * never leaves the server). Only JPEG, PNG, and WEBP are accepted, max 10 MB.
+ *
+ * @returns The public/signed URL of the stored image.
+ */
+export async function uploadReferenceImage(file: File): Promise<{ url: string }> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+
+    reader.onload = async () => {
+      try {
+        const dataUrl = reader.result as string;
+        // Strip "data:<mime>;base64," prefix to get raw base64 string
+        const base64 = dataUrl.split(",")[1];
+        if (!base64) {
+          reject(new Error("Failed to read file as base64"));
+          return;
+        }
+
+        const res = await apiFetch("/api/upload/reference-image", {
+          method: "POST",
+          body: JSON.stringify({
+            fileName: file.name,
+            mimeType: file.type,
+            data: base64,
+          }),
+        });
+
+        if (!res.ok) {
+          const errMsg = await parseErrorMessage(res, "Failed to upload reference image");
+          reject(new Error(errMsg));
+          return;
+        }
+
+        const body = (await (res.json() as Promise<unknown>)) as { url: string };
+        resolve({ url: body.url });
+      } catch (err) {
+        reject(err instanceof Error ? err : new Error("Upload failed"));
+      }
+    };
+
+    reader.onerror = () => reject(new Error("Failed to read file"));
+    reader.readAsDataURL(file);
+  });
+}

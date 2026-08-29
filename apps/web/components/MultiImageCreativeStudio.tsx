@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { getAuthHeader } from "@/lib/api-client";
 import { GeneratedCreativeVariant, CreativeGenerationRunResult } from "@ai-social/shared";
+import { ReferenceImageInput } from "@/components/studio/ReferenceImageInput";
 
 const DEFAULT_PRESET_IMAGES = [
   "https://images.unsplash.com/photo-1548036328-c9fa89d128fa?q=80&w=1200&auto=format&fit=crop",
@@ -176,25 +177,12 @@ export function MultiImageCreativeStudio() {
               </label>
             </div>
             <p className="text-[11px] text-[#6b6a65]">
-              Provide a reference image to guide composition, mood, and lighting style.
+              Upload a file or paste a URL to guide composition, mood, and lighting style.
             </p>
-            <input
-              type="text"
-              value={referenceImageUrl}
-              onChange={(e) => setReferenceImageUrl(e.target.value)}
-              placeholder="Paste reference image URL..."
-              className="w-full bg-[#0b0c0e] border border-white/10 rounded-xl px-3 py-2 text-xs text-[#f5f4f0] focus:border-[#c5a059] outline-none"
+            <ReferenceImageInput
+              value={referenceImageUrl || null}
+              onChange={(url) => setReferenceImageUrl(url || "")}
             />
-            {referenceImageUrl && (
-              <div className="relative aspect-video rounded-xl overflow-hidden border border-white/10 bg-black/40">
-                <img
-                  src={referenceImageUrl}
-                  alt="Reference Style"
-                  className="w-full h-full object-cover"
-                  onError={(e) => ((e.target as HTMLElement).style.display = "none")}
-                />
-              </div>
-            )}
           </div>
 
           {/* 2. PRODUCT / INPUT IMAGES (MULTIPLE) */}

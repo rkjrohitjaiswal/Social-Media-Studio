@@ -105,6 +105,8 @@ import { repurposeRouter } from "./routes/repurpose.js";
 app.use("/api/repurpose", repurposeRouter);
 import { contentProjectsRouter } from "./routes/content-projects.js";
 app.use("/api/content-projects", contentProjectsRouter);
+import { uploadRouter } from "./routes/upload.js";
+app.use("/api/upload", uploadRouter);
 
 
 
