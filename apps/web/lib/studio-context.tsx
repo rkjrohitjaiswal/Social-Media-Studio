@@ -6,6 +6,8 @@ import {
   markAllNotificationsAsRead,
   markNotificationAsRead,
   NotificationItem,
+  fetchUserUsage,
+  UserUsageData,
 } from "./api-client";
 import { createClient } from "./supabase/client";
 import {
@@ -57,6 +59,10 @@ interface StudioContextType {
   activeWorkspace: WorkspaceResponse | null;
   setActiveWorkspace: (ws: WorkspaceResponse) => void;
   loadWorkspaces: () => Promise<void>;
+  usage: UserUsageData | null;
+  isLoadingUsage: boolean;
+  usageError: string | null;
+  refreshUsage: () => Promise<void>;
 }
 
 const StudioContext = createContext<StudioContextType | undefined>(undefined);
@@ -82,6 +88,24 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
   ]);
   const [activeWorkspace, setActiveWorkspaceState] = useState<WorkspaceResponse | null>(null);
 
+  const [usage, setUsage] = useState<UserUsageData | null>(null);
+  const [isLoadingUsage, setIsLoadingUsage] = useState(true);
+  const [usageError, setUsageError] = useState<string | null>(null);
+
+  const refreshUsage = useCallback(async () => {
+    setIsLoadingUsage(true);
+    setUsageError(null);
+    try {
+      const data = await fetchUserUsage();
+      setUsage(data);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setUsageError(msg);
+    } finally {
+      setIsLoadingUsage(false);
+    }
+  }, []);
+
   const loadWorkspaces = async () => {
     try {
       const fetched = await getWorkspaces();
@@ -98,6 +122,10 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
       // Fallback
     }
   };
+
+  useEffect(() => {
+    refreshUsage();
+  }, [refreshUsage, activeWorkspace?.id]);
 
   useEffect(() => {
     let isSubscribed = true;
@@ -471,6 +499,10 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
         activeWorkspace,
         setActiveWorkspace,
         loadWorkspaces,
+        usage,
+        isLoadingUsage,
+        usageError,
+        refreshUsage,
       }}
     >
       {children}

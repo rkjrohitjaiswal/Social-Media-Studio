@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React from "react";
 import { Zap, AlertTriangle, Loader2 } from "lucide-react";
-import { getAuthHeader } from "@/lib/api-client";
+import { useStudio } from "@/lib/studio-context";
 
 export interface UsageData {
   plan: string;
@@ -13,40 +13,9 @@ export interface UsageData {
 }
 
 export function UsageWidget() {
-  const [usage, setUsage] = useState<UsageData | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isError, setIsError] = useState(false);
-
-  useEffect(() => {
-    let isMounted = true;
-
-    async function loadUsage() {
-      setIsLoading(true);
-      setIsError(false);
-      try {
-        const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
-        const authHeader = await getAuthHeader();
-        const res = await fetch(`${apiBase}/api/usage`, {
-          headers: { ...authHeader },
-        });
-        const json = await res.json();
-        if (isMounted && json.success && json.data) {
-          setUsage(json.data);
-        } else if (isMounted) {
-          setIsError(true);
-        }
-      } catch {
-        if (isMounted) setIsError(true);
-      } finally {
-        if (isMounted) setIsLoading(false);
-      }
-    }
-
-    loadUsage();
-    return () => {
-      isMounted = false;
-    };
-  }, []);
+  const { usage, isLoadingUsage, usageError } = useStudio();
+  const isLoading = isLoadingUsage;
+  const isError = Boolean(usageError);
 
   if (isLoading) {
     return (
