@@ -26,10 +26,12 @@ import {
   Menu,
   X,
   Building2,
+  Zap,
 } from "lucide-react";
 import { useStudio } from "@/lib/studio-context";
 import { createClient } from "@/lib/supabase/client";
 import { GlobalSearchModal } from "@/components/studio/GlobalSearchModal";
+import { fetchUserUsage, UserUsageData } from "@/lib/api-client";
 
 export default function StudioLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -48,15 +50,29 @@ export default function StudioLayout({ children }: { children: React.ReactNode }
   } = useStudio();
 
   const [showWorkspaceDropdown, setShowWorkspaceDropdown] = useState(false);
-  const [showUserDropdown, setShowUserDropdown] = useState(false);
   const [showSidebarProfileMenu, setShowSidebarProfileMenu] = useState(false);
   const [showNotifDropdown, setShowNotifDropdown] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [userProfile, setUserProfile] = useState<{ name: string; email: string } | null>(null);
+  const [userUsage, setUserUsage] = useState<UserUsageData | null>(null);
 
   const sidebarProfileRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    let isSubscribed = true;
+    async function loadUsageData() {
+      const data = await fetchUserUsage();
+      if (isSubscribed && data) {
+        setUserUsage(data);
+      }
+    }
+    loadUsageData();
+    return () => {
+      isSubscribed = false;
+    };
+  }, [pathname]);
 
   // Format a createdAt ISO string into a human-readable relative time
   function formatRelativeTime(isoDate: string): string {
@@ -133,7 +149,6 @@ export default function StudioLayout({ children }: { children: React.ReactNode }
         setShowSidebarProfileMenu(false);
         setShowWorkspaceDropdown(false);
         setShowNotifDropdown(false);
-        setShowUserDropdown(false);
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
@@ -638,50 +653,30 @@ export default function StudioLayout({ children }: { children: React.ReactNode }
               )}
             </div>
 
-            {/* USER PROFILE DROPDOWN */}
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => setShowUserDropdown(!showUserDropdown)}
-                className="flex items-center gap-2 p-1.5 rounded-xl bg-[#0B0C0E] border border-white/[0.08] hover:border-[#D4AF37]/40 transition-colors"
-              >
-                <div className="w-6 h-6 rounded-lg bg-[#D4AF37]/20 border border-[#D4AF37]/40 text-[#D4AF37] font-bold flex items-center justify-center text-xs shrink-0">
-                  {userProfile?.name ? userProfile.name.charAt(0).toUpperCase() : "A"}
-                </div>
-                <span className="text-xs font-medium text-[#F5F4F0] hidden sm:inline-block">
-                  {userProfile?.name || "Alex"}
+            {/* CREDIT BALANCE BADGE */}
+            <div
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#0B0C0E] border border-white/[0.08] text-xs font-medium text-[#F5F4F0] hover:border-[#D4AF37]/40 transition-colors shrink-0"
+              title={
+                userUsage?.isUnlimited || userUsage?.remainingCredits === "Unlimited" || userUsage?.monthlyLimit === "Unlimited"
+                  ? "Unlimited Application Credits"
+                  : userUsage
+                  ? `${userUsage.remainingCredits} / ${userUsage.monthlyLimit} Credits Available`
+                  : "Usage Credits"
+              }
+            >
+              <Zap className="w-3.5 h-3.5 text-[#D4AF37] fill-[#D4AF37] shrink-0" />
+              {userUsage?.isUnlimited || userUsage?.remainingCredits === "Unlimited" || userUsage?.monthlyLimit === "Unlimited" ? (
+                <span className="font-semibold text-[#D4AF37]">
+                  <span className="hidden sm:inline">∞ Unlimited</span>
+                  <span className="sm:hidden">∞</span>
                 </span>
-                <ChevronDown className="w-3 h-3 text-[#9E9D98]" />
-              </button>
-
-              {showUserDropdown && (
-                <div className="absolute right-0 mt-2 w-48 bg-[#151618] border border-white/[0.08] rounded-xl shadow-2xl z-50 overflow-hidden py-1">
-                  <div className="px-3 py-2 border-b border-white/[0.08]">
-                    <div className="text-xs font-bold text-[#F5F4F0]">{userProfile?.name}</div>
-                    <div className="text-[10px] text-[#9E9D98] truncate">{userProfile?.email}</div>
-                  </div>
-                  <Link
-                    href="/settings/profile"
-                    onClick={() => setShowUserDropdown(false)}
-                    className="block px-3 py-2 text-xs text-[#9E9D98] hover:text-[#F5F4F0] hover:bg-white/5"
-                  >
-                    Account Profile
-                  </Link>
-                  <Link
-                    href="/settings"
-                    onClick={() => setShowUserDropdown(false)}
-                    className="block px-3 py-2 text-xs text-[#9E9D98] hover:text-[#F5F4F0] hover:bg-white/5"
-                  >
-                    Workspace Settings
-                  </Link>
-                  <button
-                    type="button"
-                    onClick={handleSignOut}
-                    className="w-full text-left px-3 py-2 text-xs text-red-400 hover:bg-red-500/10 border-t border-white/[0.08]"
-                  >
-                    Sign Out
-                  </button>
-                </div>
+              ) : userUsage ? (
+                <span className="font-semibold">
+                  <span>{userUsage.remainingCredits}</span>
+                  <span className="hidden sm:inline text-[#9E9D98] ml-1">Credits</span>
+                </span>
+              ) : (
+                <span className="text-[#9E9D98] text-[11px]">...</span>
               )}
             </div>
           </div>

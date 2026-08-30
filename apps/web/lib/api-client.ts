@@ -390,3 +390,27 @@ export async function deleteNotificationApi(id: string): Promise<void> {
     // Non-fatal
   }
 }
+
+export interface UserUsageData {
+  plan: string;
+  isUnlimited?: boolean;
+  monthlyLimit: number | string;
+  usedCredits: number;
+  remainingCredits: number | string;
+  resetPeriod?: string;
+}
+
+/** Fetch current user/workspace usage & credit state. */
+export async function fetchUserUsage(): Promise<UserUsageData | null> {
+  try {
+    const res = await apiFetch("/api/usage");
+    if (!res.ok) return null;
+    const body = (await res.json() as any);
+    if (body.success && body.data) {
+      return body.data as UserUsageData;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
