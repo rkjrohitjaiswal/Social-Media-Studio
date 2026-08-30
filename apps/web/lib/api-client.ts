@@ -461,6 +461,20 @@ export interface AdminUserListItem {
   creditsRemaining: number;
 }
 
+export interface AdminAuditLogItem {
+  id: string;
+  adminUserId: string;
+  adminEmail: string;
+  targetUserId: string;
+  targetEmail: string;
+  action: string;
+  previousPlan: string;
+  newPlan: string;
+  subscriptionSource: string;
+  metadata?: any;
+  createdAt: string;
+}
+
 export async function fetchAdminStats(): Promise<AdminStats | null> {
   try {
     const res = await apiFetch("/api/admin/stats");
@@ -475,14 +489,20 @@ export async function fetchAdminStats(): Promise<AdminStats | null> {
 export async function fetchAdminUsers(
   page: number = 1,
   limit: number = 20,
-  search: string = ""
+  search: string = "",
+  plan: string = "",
+  source: string = ""
 ): Promise<{ users: AdminUserListItem[]; totalPages: number; total: number } | null> {
   try {
-    const query = new URLSearchParams({
+    const params: Record<string, string> = {
       page: String(page),
       limit: String(limit),
-      search,
-    }).toString();
+    };
+    if (search) params.search = search;
+    if (plan) params.plan = plan;
+    if (source) params.source = source;
+
+    const query = new URLSearchParams(params).toString();
 
     const res = await apiFetch(`/api/admin/users?${query}`);
     if (!res.ok) return null;
@@ -528,6 +548,48 @@ export async function revokeUserSubscription(
     return { success: true, message: body.message };
   } catch (err: unknown) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+export async function adjustUserCredits(
+  targetUserId: string,
+  bonusCredits: number = 0,
+  resetUsage: boolean = false,
+  notes?: string
+): Promise<{ success: boolean; message?: string; error?: string }> {
+  try {
+    const res = await apiFetch(`/api/admin/users/${targetUserId}/credits`, {
+      method: "POST",
+      body: JSON.stringify({ bonusCredits, resetUsage, notes }),
+    });
+    const body = (await res.json() as any);
+    if (!res.ok) return { success: false, error: body.error || "Failed to adjust credits" };
+    return { success: true, message: body.message };
+  } catch (err: unknown) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+export async function fetchAdminAuditLogs(
+  page: number = 1,
+  limit: number = 20
+): Promise<{ logs: AdminAuditLogItem[]; totalPages: number; total: number } | null> {
+  try {
+    const query = new URLSearchParams({
+      page: String(page),
+      limit: String(limit),
+    }).toString();
+
+    const res = await apiFetch(`/api/admin/audit-logs?${query}`);
+    if (!res.ok) return null;
+    const body = (await res.json() as any);
+    return {
+      logs: body.logs || [],
+      totalPages: body.pagination?.totalPages || 1,
+      total: body.pagination?.total || 0,
+    };
+  } catch {
+    return null;
   }
 }
 

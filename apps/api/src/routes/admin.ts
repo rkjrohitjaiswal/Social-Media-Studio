@@ -47,24 +47,57 @@ adminRouter.get("/stats", async (req: AuthenticatedRequest, res: Response) => {
 
 /**
  * GET /api/admin/users
- * Paginated list of users with subscription & credit details.
+ * Paginated list of users with subscription & credit details, plus optional plan/source filters.
  */
 adminRouter.get("/users", async (req: AuthenticatedRequest, res: Response) => {
   try {
     const page = Math.max(1, parseInt(String(req.query.page || "1"), 10));
     const limit = Math.min(100, Math.max(1, parseInt(String(req.query.limit || "20"), 10)));
     const search = String(req.query.search || "").trim();
+    const planFilter = String(req.query.plan || "").trim().toUpperCase();
+    const sourceFilter = String(req.query.source || "").trim().toUpperCase();
 
-    const whereClause: any = search
-      ? {
+    const whereConditions: any[] = [];
+
+    if (search) {
+      whereConditions.push({
+        OR: [
+          { email: { contains: search, mode: "insensitive" } },
+          { fullName: { contains: search, mode: "insensitive" } },
+          { firstName: { contains: search, mode: "insensitive" } },
+          { lastName: { contains: search, mode: "insensitive" } },
+        ],
+      });
+    }
+
+    if (planFilter) {
+      if (planFilter === "FREE") {
+        whereConditions.push({
           OR: [
-            { email: { contains: search, mode: "insensitive" } },
-            { fullName: { contains: search, mode: "insensitive" } },
-            { firstName: { contains: search, mode: "insensitive" } },
-            { lastName: { contains: search, mode: "insensitive" } },
+            { subscription: null },
+            { subscription: { status: { not: "ACTIVE" } } },
+            { subscription: { plan: "FREE" } },
           ],
-        }
-      : {};
+        });
+      } else {
+        whereConditions.push({
+          subscription: {
+            status: "ACTIVE",
+            plan: planFilter,
+          },
+        });
+      }
+    }
+
+    if (sourceFilter) {
+      whereConditions.push({
+        subscription: {
+          subscriptionSource: sourceFilter,
+        },
+      });
+    }
+
+    const whereClause = whereConditions.length > 0 ? { AND: whereConditions } : {};
 
     const [total, users] = await Promise.all([
       prisma.user.count({ where: whereClause }),
@@ -198,6 +231,7 @@ adminRouter.post("/users/:id/subscription", async (req: AuthenticatedRequest, re
         monthlyCreditsUsed: 0,
         lastMonthlyReset: now,
         freeCreditsTotal: newCreditLimit,
+        freeCreditsUsed: 0,
         updatedAt: now,
       },
       create: {
@@ -279,6 +313,8 @@ adminRouter.delete("/users/:id/subscription", async (req: AuthenticatedRequest, 
       update: {
         monthlyCreditsAllowance: 3,
         monthlyCreditsUsed: 0,
+        freeCreditsTotal: 3,
+        freeCreditsUsed: 0,
         lastMonthlyReset: now,
         updatedAt: now,
       },
@@ -314,5 +350,140 @@ adminRouter.delete("/users/:id/subscription", async (req: AuthenticatedRequest, 
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     return res.status(500).json({ success: false, error: `Failed to revoke subscription: ${msg}` });
+  }
+});
+
+/**
+ * POST /api/admin/users/:id/credits
+ * Manually adjusts credit allowance or resets used credits for a user.
+ */
+adminRouter.post("/users/:id/credits", async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const targetUserId = req.params.id;
+    const { bonusCredits = 0, resetUsage = false, notes } = req.body;
+
+    const targetUser = await prisma.user.findUnique({
+      where: { id: targetUserId },
+      include: { usage: true, subscription: true },
+    });
+
+    if (!targetUser) {
+      return res.status(404).json({ success: false, error: "Target user not found" });
+    }
+
+    const now = new Date();
+    const currentTotal = targetUser.usage?.freeCreditsTotal || 10;
+    const currentUsed = targetUser.usage?.freeCreditsUsed || 0;
+
+    const newTotal = currentTotal + Math.max(0, parseInt(String(bonusCredits), 10) || 0);
+    const newUsed = resetUsage ? 0 : currentUsed;
+
+    const updatedUsage = await prisma.userUsage.upsert({
+      where: { userId: targetUserId },
+      update: {
+        freeCreditsTotal: newTotal,
+        monthlyCreditsAllowance: newTotal,
+        freeCreditsUsed: newUsed,
+        monthlyCreditsUsed: newUsed,
+        updatedAt: now,
+      },
+      create: {
+        userId: targetUserId,
+        freeCreditsTotal: newTotal,
+        freeCreditsUsed: newUsed,
+        permanentCreditsTotal: newTotal,
+        permanentCreditsUsed: newUsed,
+        monthlyCreditsAllowance: newTotal,
+        monthlyCreditsUsed: newUsed,
+        lastMonthlyReset: now,
+      },
+    });
+
+    // Create Audit Log Entry
+    await prisma.adminAuditLog.create({
+      data: {
+        adminUserId: req.user!.id,
+        targetUserId,
+        action: resetUsage ? "RESET_CREDITS" : "ADD_CREDITS",
+        previousPlan: targetUser.subscription?.plan || "FREE",
+        newPlan: targetUser.subscription?.plan || "FREE",
+        subscriptionSource: targetUser.subscription?.subscriptionSource || "RAZORPAY",
+        metadataJson: { bonusCredits, resetUsage, previousTotal: currentTotal, newTotal, notes },
+      },
+    });
+
+    return res.json({
+      success: true,
+      message: `Successfully updated credits for ${targetUser.email}. Total: ${newTotal}, Used: ${newUsed}`,
+      usage: updatedUsage,
+    });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return res.status(500).json({ success: false, error: `Failed to adjust credits: ${msg}` });
+  }
+});
+
+/**
+ * GET /api/admin/audit-logs
+ * Paginated list of administrative audit log actions.
+ */
+adminRouter.get("/audit-logs", async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const page = Math.max(1, parseInt(String(req.query.page || "1"), 10));
+    const limit = Math.min(100, Math.max(1, parseInt(String(req.query.limit || "20"), 10)));
+
+    const [total, logs] = await Promise.all([
+      prisma.adminAuditLog.count(),
+      prisma.adminAuditLog.findMany({
+        select: {
+          id: true,
+          adminUserId: true,
+          targetUserId: true,
+          action: true,
+          previousPlan: true,
+          newPlan: true,
+          subscriptionSource: true,
+          metadataJson: true,
+          createdAt: true,
+          adminUser: {
+            select: { email: true, fullName: true },
+          },
+          targetUser: {
+            select: { email: true, fullName: true },
+          },
+        },
+        orderBy: { createdAt: "desc" },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+    ]);
+
+    const formattedLogs = logs.map((l: any) => ({
+      id: l.id,
+      adminUserId: l.adminUserId,
+      adminEmail: l.adminUser?.email || l.adminUserId,
+      targetUserId: l.targetUserId,
+      targetEmail: l.targetUser?.email || l.targetUserId,
+      action: l.action,
+      previousPlan: l.previousPlan,
+      newPlan: l.newPlan,
+      subscriptionSource: l.subscriptionSource,
+      metadata: l.metadataJson,
+      createdAt: l.createdAt.toISOString(),
+    }));
+
+    return res.json({
+      success: true,
+      logs: formattedLogs,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+    });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return res.status(500).json({ success: false, error: `Failed to fetch audit logs: ${msg}` });
   }
 });
