@@ -42,3 +42,4 @@ Thumbs.db
 ai-social-media-studio*.json
 *-*.json
 
+.gemini/
