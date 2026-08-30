@@ -16,6 +16,8 @@ import {
   NotificationItem,
 } from "@ai-social/shared";
 
+import { createClient } from "./supabase/client";
+
 // Re-export for consumers that import from this file
 export type { NotificationItem };
 
@@ -37,10 +39,7 @@ async function apiFetch(endpoint: string, options: RequestInit = {}): Promise<Re
   const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
   const url = `${baseUrl}${endpoint}`;
 
-  const defaultHeaders: HeadersInit = {
-    "Content-Type": "application/json",
-    "x-workspace-id": getActiveWorkspaceId(),
-  };
+  const defaultHeaders = await getAuthHeader();
 
   const response = await fetch(url, {
     ...options,
@@ -283,10 +282,22 @@ export async function reviewPublicApproval(
 }
 
 export async function getAuthHeader(): Promise<Record<string, string>> {
-  return {
+  const headers: Record<string, string> = {
     "Content-Type": "application/json",
     "x-workspace-id": getActiveWorkspaceId(),
   };
+
+  try {
+    const supabase = createClient();
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.access_token) {
+      headers["Authorization"] = `Bearer ${session.access_token}`;
+    }
+  } catch {
+    // Ignore error if Supabase session is unavailable
+  }
+
+  return headers;
 }
 
 /**

@@ -644,30 +644,33 @@ export default function StudioLayout({ children }: { children: React.ReactNode }
           <div className="flex items-center gap-3">
             {/* CREDIT BALANCE INDICATOR */}
             {isLoadingUsage ? (
-              <div className="h-8 w-24 bg-white/10 rounded-xl animate-pulse" />
-            ) : usage ? (
+              <div className="h-8 w-28 bg-[#0B0C0E] border border-white/[0.08] rounded-xl animate-pulse shrink-0 flex items-center gap-1.5 px-3 py-1.5 text-xs text-[#9E9D98]">
+                <Zap className="w-3.5 h-3.5 text-[#D4AF37] opacity-40 animate-pulse" />
+                <span className="h-3 w-12 bg-white/10 rounded" />
+              </div>
+            ) : (
               <Link
                 href="/settings/billing"
-                title={`${usage.remainingCredits} / ${usage.monthlyLimit} credits available. Click to manage subscription.`}
-                className={`px-3 py-1.5 rounded-xl border text-xs font-medium transition-all flex items-center gap-1.5 shrink-0 ${
-                  usage.remainingCredits <= 0
+                title={`${usage?.remainingCredits ?? 0} / ${usage?.monthlyLimit ?? 10} credits available. Click to manage subscription.`}
+                className={`px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all flex items-center gap-1.5 shrink-0 whitespace-nowrap cursor-pointer z-10 ${
+                  (usage?.remainingCredits ?? 0) <= 0
                     ? "bg-red-500/10 border-red-500/40 text-red-400 hover:bg-red-500/20"
-                    : usage.remainingCredits <= 2
+                    : (usage?.remainingCredits ?? 0) <= 2
                     ? "bg-amber-500/10 border-amber-500/40 text-amber-300 hover:bg-amber-500/20"
                     : "bg-[#0B0C0E] border-white/[0.08] text-[#F5F4F0] hover:border-[#D4AF37]/40 hover:text-[#D4AF37]"
                 }`}
               >
-                <Zap className={`w-3.5 h-3.5 ${usage.remainingCredits <= 0 ? "text-red-400 fill-red-400" : "text-[#D4AF37] fill-[#D4AF37]"}`} />
-                <span className="font-semibold">
-                  {usage.remainingCredits} {usage.remainingCredits === 1 ? "credit" : "credits"}
+                <Zap className={`w-3.5 h-3.5 shrink-0 ${(usage?.remainingCredits ?? 0) <= 0 ? "text-red-400 fill-red-400" : "text-[#D4AF37] fill-[#D4AF37]"}`} />
+                <span className="font-semibold inline-block">
+                  {usage?.remainingCredits ?? 0} {(usage?.remainingCredits ?? 0) === 1 ? "credit" : "credits"}
                 </span>
-                {usage.remainingCredits <= 0 && (
+                {(usage?.remainingCredits ?? 0) <= 0 && (
                   <span className="ml-1 text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-red-500/20 text-red-300">
                     Upgrade
                   </span>
                 )}
               </Link>
-            ) : null}
+            )}
 
             {/* NOTIFICATION BELL */}
             <div className="relative">
