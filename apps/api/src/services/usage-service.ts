@@ -6,10 +6,10 @@ export interface StoredUserUsage {
   workspaceId?: string;
   freeCreditsTotal: number;
   freeCreditsUsed: number;
-  permanentCreditsTotal: number;
-  permanentCreditsUsed: number;
-  monthlyCreditsAllowance: number;
-  monthlyCreditsUsed: number;
+  permanentCreditsTotal?: number;
+  permanentCreditsUsed?: number;
+  monthlyCreditsAllowance?: number;
+  monthlyCreditsUsed?: number;
   monthlyCycleStart?: Date;
   lastMonthlyReset?: Date;
   userCreatedAt?: Date;
@@ -21,15 +21,19 @@ export interface DetailedUserUsage {
   freeCreditsTotal: number;
   freeCreditsUsed: number;
   freeCreditsRemaining: number;
+  monthlyLimit: number;
+  usedCredits: number;
+  remainingCredits: number;
+  totalRemainingCredits: number;
   permanentCreditsTotal: number;
   permanentCreditsUsed: number;
   permanentCreditsRemaining: number;
   monthlyCreditsAllowance: number;
   monthlyCreditsUsed: number;
   monthlyCreditsRemaining: number;
-  totalRemainingCredits: number;
   nextMonthlyResetDate: string;
   isInitialMonth: boolean;
+  cycleIndex: number;
 }
 
 // In-Memory Stores for Test / Fallback & Authoritative Locks
@@ -53,6 +57,8 @@ export function setInMemoryUserCreatedAt(userId: string, createdAt: Date): void 
   const existing = usageMemoryStore.get(userId);
   if (existing) {
     existing.userCreatedAt = createdAt;
+    existing.monthlyCycleStart = undefined;
+    existing.lastMonthlyReset = undefined;
   }
 }
 
@@ -70,8 +76,9 @@ export function addMonths(date: Date, months: number): Date {
 }
 
 /**
- * Determines the current monthly cycle start date, next reset date, and whether
- * the user is still within their initial 30-day signup period.
+ * Determines the current monthly cycle start date, next reset date, and cycle index based on user signup date.
+ * Cycle 0 (Month 1): userCreatedAt -> userCreatedAt + 1 Month (Allowance: 10 credits)
+ * Cycle 1+ (Month 2+): userCreatedAt + k Months -> userCreatedAt + (k+1) Months (Allowance: 3 credits)
  */
 export function getMonthlyCycleInfo(userCreatedAt: Date, now: Date): {
   isInitialMonth: boolean;
@@ -162,7 +169,7 @@ export async function canUseCredits(userId: string, amount: number = 1): Promise
 }
 
 /**
- * Retrieves the current usage summary and handles lazy monthly resets.
+ * Retrieves the current single usage summary and performs lazy monthly cycle resets.
  */
 export async function getUserUsage(userIdOrWorkspaceId: string): Promise<DetailedUserUsage> {
   if (!userIdOrWorkspaceId) {
@@ -187,10 +194,10 @@ export async function getUserUsage(userIdOrWorkspaceId: string): Promise<Detaile
           userId: dbRecord.userId,
           freeCreditsTotal: dbRecord.freeCreditsTotal,
           freeCreditsUsed: dbRecord.freeCreditsUsed,
-          permanentCreditsTotal: dbRecord.permanentCreditsTotal ?? 10,
-          permanentCreditsUsed: dbRecord.permanentCreditsUsed ?? dbRecord.freeCreditsUsed ?? 0,
-          monthlyCreditsAllowance: dbRecord.monthlyCreditsAllowance ?? 3,
-          monthlyCreditsUsed: dbRecord.monthlyCreditsUsed ?? 0,
+          permanentCreditsTotal: dbRecord.permanentCreditsTotal ?? dbRecord.freeCreditsTotal,
+          permanentCreditsUsed: dbRecord.permanentCreditsUsed ?? dbRecord.freeCreditsUsed,
+          monthlyCreditsAllowance: dbRecord.monthlyCreditsAllowance ?? dbRecord.freeCreditsTotal,
+          monthlyCreditsUsed: dbRecord.monthlyCreditsUsed ?? dbRecord.freeCreditsUsed,
           monthlyCycleStart: dbRecord.monthlyCycleStart || undefined,
           lastMonthlyReset: dbRecord.lastMonthlyReset || undefined,
           userCreatedAt: dbRecord.user?.createdAt || dbRecord.createdAt,
@@ -227,17 +234,25 @@ export async function getUserUsage(userIdOrWorkspaceId: string): Promise<Detaile
 
   const cycleInfo = getMonthlyCycleInfo(userCreatedAt, now);
 
+  // Determine single authoritative allowance for the current cycle
+  let currentAllowance = 10;
+  if (plan === "FREE") {
+    currentAllowance = cycleInfo.isInitialMonth ? 10 : 3;
+  } else {
+    currentAllowance = entitlements.monthlyWorkflows;
+  }
+
   if (!record) {
     record = {
       userId,
-      freeCreditsTotal: 10,
+      freeCreditsTotal: currentAllowance,
       freeCreditsUsed: 0,
-      permanentCreditsTotal: 10,
+      permanentCreditsTotal: currentAllowance,
       permanentCreditsUsed: 0,
-      monthlyCreditsAllowance: cycleInfo.isInitialMonth ? 0 : 3,
+      monthlyCreditsAllowance: currentAllowance,
       monthlyCreditsUsed: 0,
       monthlyCycleStart: cycleInfo.cycleStart,
-      lastMonthlyReset: cycleInfo.isInitialMonth ? undefined : now,
+      lastMonthlyReset: now,
       userCreatedAt,
       createdAt: now,
       updatedAt: now,
@@ -250,14 +265,14 @@ export async function getUserUsage(userIdOrWorkspaceId: string): Promise<Detaile
         update: {},
         create: {
           userId,
-          freeCreditsTotal: 10,
+          freeCreditsTotal: currentAllowance,
           freeCreditsUsed: 0,
-          permanentCreditsTotal: 10,
+          permanentCreditsTotal: currentAllowance,
           permanentCreditsUsed: 0,
-          monthlyCreditsAllowance: cycleInfo.isInitialMonth ? 0 : 3,
+          monthlyCreditsAllowance: currentAllowance,
           monthlyCreditsUsed: 0,
           monthlyCycleStart: cycleInfo.cycleStart,
-          lastMonthlyReset: cycleInfo.isInitialMonth ? undefined : now,
+          lastMonthlyReset: now,
         },
       });
     } catch {
@@ -265,25 +280,22 @@ export async function getUserUsage(userIdOrWorkspaceId: string): Promise<Detaile
     }
   }
 
-  // Determine target monthly allowance based on plan and cycle
-  let monthlyAllowance = 0;
-  if (plan === "FREE") {
-    monthlyAllowance = cycleInfo.isInitialMonth ? 0 : 3;
-  } else {
-    monthlyAllowance = entitlements.monthlyWorkflows;
-  }
-
-  // ── LAZY MONTHLY RESET ──────────────────────────────────────────────────────
+  // ── LAZY MONTHLY CYCLE RESET ───────────────────────────────────────────────
   // Trigger reset if:
-  // 1. Not in initial month (or on a paid plan), AND
-  // 2. Haven't performed a monthly reset for the current cycle yet.
+  // 1. Haven't performed a monthly reset for the current cycle yet (cycleStart > lastMonthlyReset), OR
+  // 2. Transitioning from Month 1 (allowance=10) to Month 2+ (allowance=3) on FREE plan.
   const needsReset =
-    (!cycleInfo.isInitialMonth || plan !== "FREE") &&
-    (!record.lastMonthlyReset || record.lastMonthlyReset < cycleInfo.cycleStart);
+    !record.lastMonthlyReset ||
+    record.lastMonthlyReset < cycleInfo.cycleStart ||
+    record.freeCreditsTotal !== currentAllowance;
 
   if (needsReset) {
+    record.freeCreditsTotal = currentAllowance;
+    record.freeCreditsUsed = 0;
+    record.permanentCreditsTotal = currentAllowance;
+    record.permanentCreditsUsed = 0;
+    record.monthlyCreditsAllowance = currentAllowance;
     record.monthlyCreditsUsed = 0;
-    record.monthlyCreditsAllowance = monthlyAllowance;
     record.monthlyCycleStart = cycleInfo.cycleStart;
     record.lastMonthlyReset = now;
     record.updatedAt = now;
@@ -294,8 +306,12 @@ export async function getUserUsage(userIdOrWorkspaceId: string): Promise<Detaile
       await prisma.userUsage.update({
         where: { userId },
         data: {
+          freeCreditsTotal: currentAllowance,
+          freeCreditsUsed: 0,
+          permanentCreditsTotal: currentAllowance,
+          permanentCreditsUsed: 0,
+          monthlyCreditsAllowance: currentAllowance,
           monthlyCreditsUsed: 0,
-          monthlyCreditsAllowance: monthlyAllowance,
           monthlyCycleStart: cycleInfo.cycleStart,
           lastMonthlyReset: now,
           updatedAt: now,
@@ -306,33 +322,30 @@ export async function getUserUsage(userIdOrWorkspaceId: string): Promise<Detaile
     }
   }
 
-  const permanentTotal = record.permanentCreditsTotal ?? 10;
-  const permanentUsed = record.permanentCreditsUsed ?? 0;
-  const permanentRemaining = Math.max(0, permanentTotal - permanentUsed);
-
-  const monthlyUsed = record.monthlyCreditsUsed ?? 0;
-  const monthlyRemaining = Math.max(0, monthlyAllowance - monthlyUsed);
-
-  const totalRemaining = permanentRemaining + monthlyRemaining;
-  const totalLimit = plan === "FREE" ? permanentTotal + monthlyAllowance : monthlyAllowance;
-
-  // Sync legacy total/used fields
-  record.freeCreditsTotal = totalLimit;
-  record.freeCreditsUsed = permanentUsed + monthlyUsed;
+  const freeCreditsTotal = record.freeCreditsTotal;
+  const freeCreditsUsed = record.freeCreditsUsed;
+  const freeCreditsRemaining = Math.max(0, freeCreditsTotal - freeCreditsUsed);
 
   return {
-    freeCreditsTotal: totalLimit,
-    freeCreditsUsed: permanentUsed + monthlyUsed,
-    freeCreditsRemaining: totalRemaining,
-    permanentCreditsTotal: permanentTotal,
-    permanentCreditsUsed: permanentUsed,
-    permanentCreditsRemaining: permanentRemaining,
-    monthlyCreditsAllowance: monthlyAllowance,
-    monthlyCreditsUsed: monthlyUsed,
-    monthlyCreditsRemaining: monthlyRemaining,
-    totalRemainingCredits: totalRemaining,
+    freeCreditsTotal,
+    freeCreditsUsed,
+    freeCreditsRemaining,
+    monthlyLimit: freeCreditsTotal,
+    usedCredits: freeCreditsUsed,
+    remainingCredits: freeCreditsRemaining,
+    totalRemainingCredits: freeCreditsRemaining,
+
+    // Backward-compatible mirror fields for single-balance model
+    permanentCreditsTotal: freeCreditsTotal,
+    permanentCreditsUsed: freeCreditsUsed,
+    permanentCreditsRemaining: freeCreditsRemaining,
+    monthlyCreditsAllowance: freeCreditsTotal,
+    monthlyCreditsUsed: freeCreditsUsed,
+    monthlyCreditsRemaining: freeCreditsRemaining,
+
     nextMonthlyResetDate: cycleInfo.nextResetDate.toISOString(),
     isInitialMonth: cycleInfo.isInitialMonth,
+    cycleIndex: cycleInfo.cycleIndex,
   };
 }
 
@@ -354,10 +367,10 @@ export async function checkUsageAccess(
   const usage = await getUserUsage(userId);
   const isPaid = plan !== "FREE";
 
-  if (usage.totalRemainingCredits > 0) {
+  if (usage.freeCreditsRemaining > 0) {
     return {
       allowed: true,
-      freeCreditsRemaining: usage.totalRemainingCredits,
+      freeCreditsRemaining: usage.freeCreditsRemaining,
       isPro: isPaid,
     };
   }
@@ -366,7 +379,7 @@ export async function checkUsageAccess(
     return {
       allowed: false,
       code: "PLAN_LIMIT_REACHED",
-      message: "Your free credits are exhausted. Please upgrade your plan to continue.",
+      message: "Your monthly credits are exhausted. Please upgrade your plan to continue.",
       freeCreditsRemaining: 0,
       isPro: false,
     };
@@ -375,17 +388,14 @@ export async function checkUsageAccess(
   return {
     allowed: false,
     code: "USAGE_LIMIT_REACHED",
-    message: `You have reached your monthly limit of ${usage.monthlyCreditsAllowance} credits for the ${plan} plan. Upgrade to a higher tier to continue.`,
+    message: `You have reached your monthly limit of ${usage.monthlyLimit} credits for the ${plan} plan. Upgrade to a higher tier to continue.`,
     freeCreditsRemaining: 0,
     isPro: true,
   };
 }
 
 /**
- * Consumes credits atomically with lock protection against double-charges or negative balances.
- * Consumption Order:
- *   1. Monthly Credits (if available) — because monthly credits expire at cycle end.
- *   2. Permanent Credits — preserved until monthly credits are exhausted.
+ * Consumes credits atomically from the single credit balance with lock protection.
  */
 export async function consumeUsage(
   userIdOrWorkspaceId: string,
@@ -400,7 +410,7 @@ export async function consumeUsage(
     if (!access.allowed) {
       const err = new Error(
         access.code === "PLAN_LIMIT_REACHED"
-          ? "PLAN_LIMIT_REACHED: Your free credits are exhausted. Please upgrade your plan to continue."
+          ? "PLAN_LIMIT_REACHED: Your monthly credits are exhausted. Please upgrade your plan to continue."
           : `USAGE_LIMIT_REACHED: You have reached your monthly credit limit for the ${plan} plan.`
       );
       (err as any).statusCode = 402;
@@ -411,29 +421,11 @@ export async function consumeUsage(
     const now = new Date();
 
     let record = usageMemoryStore.get(userId)!;
+    const newUsed = record.freeCreditsUsed + cost;
 
-    let permanentUsed = record.permanentCreditsUsed ?? 0;
-    let monthlyUsed = record.monthlyCreditsUsed ?? 0;
-
-    let remainingToConsume = cost;
-
-    // 1. Consume from monthly credits first
-    if (currentUsage.monthlyCreditsRemaining > 0) {
-      const monthlyAvailable = currentUsage.monthlyCreditsRemaining;
-      const consumeFromMonthly = Math.min(monthlyAvailable, remainingToConsume);
-      monthlyUsed += consumeFromMonthly;
-      remainingToConsume -= consumeFromMonthly;
-    }
-
-    // 2. Consume remaining cost from permanent credits
-    if (remainingToConsume > 0) {
-      permanentUsed += remainingToConsume;
-      remainingToConsume = 0;
-    }
-
-    record.permanentCreditsUsed = permanentUsed;
-    record.monthlyCreditsUsed = monthlyUsed;
-    record.freeCreditsUsed = permanentUsed + monthlyUsed;
+    record.freeCreditsUsed = newUsed;
+    record.permanentCreditsUsed = newUsed;
+    record.monthlyCreditsUsed = newUsed;
     record.updatedAt = now;
 
     usageMemoryStore.set(userId, record);
@@ -442,19 +434,19 @@ export async function consumeUsage(
       await prisma.userUsage.upsert({
         where: { userId },
         update: {
-          permanentCreditsUsed: permanentUsed,
-          monthlyCreditsUsed: monthlyUsed,
-          freeCreditsUsed: permanentUsed + monthlyUsed,
+          freeCreditsUsed: newUsed,
+          permanentCreditsUsed: newUsed,
+          monthlyCreditsUsed: newUsed,
           updatedAt: now,
         },
         create: {
           userId,
           freeCreditsTotal: currentUsage.freeCreditsTotal,
-          freeCreditsUsed: permanentUsed + monthlyUsed,
-          permanentCreditsTotal: record.permanentCreditsTotal ?? 10,
-          permanentCreditsUsed: permanentUsed,
-          monthlyCreditsAllowance: record.monthlyCreditsAllowance ?? 3,
-          monthlyCreditsUsed: monthlyUsed,
+          freeCreditsUsed: newUsed,
+          permanentCreditsTotal: currentUsage.freeCreditsTotal,
+          permanentCreditsUsed: newUsed,
+          monthlyCreditsAllowance: currentUsage.freeCreditsTotal,
+          monthlyCreditsUsed: newUsed,
         },
       });
     } catch {
@@ -466,7 +458,7 @@ export async function consumeUsage(
     return {
       freeCreditsTotal: updatedUsage.freeCreditsTotal,
       freeCreditsUsed: updatedUsage.freeCreditsUsed,
-      freeCreditsRemaining: updatedUsage.totalRemainingCredits,
+      freeCreditsRemaining: updatedUsage.freeCreditsRemaining,
     };
   });
 }

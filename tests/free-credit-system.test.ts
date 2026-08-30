@@ -1,21 +1,17 @@
 /**
- * Finalized FREE Credit System Comprehensive Test Suite
+ * Single-Balance Monthly FREE Credit System Test Suite
  *
- * Requirements tested (1-14):
- *   1. New user gets 10 permanent credits.
- *   2. New user gets 0 monthly credits initially.
- *   3. Permanent credits survive one month.
- *   4. Month 2 grants exactly 3 monthly credits.
- *   5. Monthly credits reset to 3 in month 3.
- *   6. Unused monthly credits do not roll over.
- *   7. Permanent credits continue surviving monthly resets.
- *   8. Permanent credits can eventually reach 0.
- *   9. User still receives 3 monthly credits after permanent credits reach 0.
- *  10. Repeated API calls do not grant duplicate monthly credits.
- *  11. Concurrent usage/reset operations are safe.
- *  12. Paid subscriptions are unaffected.
- *  13. Admin-granted subscriptions are unaffected.
- *  14. Existing authentication remains unaffected.
+ * Requirements tested:
+ *   1. New user receives 10 credits total for Month 1 (first monthly cycle).
+ *   2. First month credits are NOT permanent — unused Month 1 credits do NOT carry over.
+ *   3. Month 2 grants exactly 3 credits regardless of Month 1 usage (e.g., 6/10 used -> 3 credits).
+ *   4. Month 3 grants exactly 3 credits regardless of Month 2 usage (e.g., 2/3 used -> 3 credits).
+ *   5. Previous unused credits expire on monthly cycle transition.
+ *   6. Repeated API calls do not grant duplicate credits.
+ *   7. Concurrent usage/reset operations are thread-safe.
+ *   8. Paid subscriptions remain unaffected (e.g., PRO = 50 credits/month).
+ *   9. Admin-granted subscriptions remain unaffected.
+ *  10. Idempotent initialization: repeated initializations do not alter credit balance.
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
@@ -80,7 +76,7 @@ vi.mock("@ai-social/database", () => {
   };
 });
 
-describe("Finalized FREE Credit System (Scenarios 1-14)", () => {
+describe("Single-Balance Monthly FREE Credit System", () => {
   beforeEach(() => {
     clearInMemoryUsage();
     clearInMemorySubscriptions();
@@ -92,160 +88,97 @@ describe("Finalized FREE Credit System (Scenarios 1-14)", () => {
     clearInMemorySubscriptions();
   });
 
-  it("1. New user gets 10 permanent credits", async () => {
+  it("1. New user gets 10 credits total for Month 1", async () => {
     const userId = "test-user-1";
     const usage = await getUserUsage(userId);
-    expect(usage.permanentCreditsTotal).toBe(10);
-    expect(usage.permanentCreditsUsed).toBe(0);
-    expect(usage.permanentCreditsRemaining).toBe(10);
-  });
-
-  it("2. New user gets 0 monthly credits initially", async () => {
-    const userId = "test-user-2";
-    const usage = await getUserUsage(userId);
     expect(usage.isInitialMonth).toBe(true);
-    expect(usage.monthlyCreditsAllowance).toBe(0);
-    expect(usage.monthlyCreditsRemaining).toBe(0);
-    expect(usage.totalRemainingCredits).toBe(10);
+    expect(usage.freeCreditsTotal).toBe(10);
+    expect(usage.freeCreditsUsed).toBe(0);
+    expect(usage.freeCreditsRemaining).toBe(10);
   });
 
-  it("3. Permanent credits survive one month", async () => {
-    const userId = "test-user-3";
+  it("2. User consuming 6/10 in Month 1 receives exactly 3 credits in Month 2 (no rollover)", async () => {
+    const userId = "test-user-2";
     const now = new Date();
-    // User signed up today (Month 1), consumes 2 permanent credits
     setInMemoryUserCreatedAt(userId, now);
-    await consumeUsage(userId, "CONTENT_GENERATION", 2);
 
-    // Fast-forward user's creation date to 1 month ago (Month 2)
-    const signupDate = addMonths(now, -1);
-    setInMemoryUserCreatedAt(userId, signupDate);
+    // Consume 6 credits in Month 1
+    await consumeUsage(userId, "CONTENT_GENERATION", 6);
+    const m1Usage = await getUserUsage(userId);
+    expect(m1Usage.freeCreditsUsed).toBe(6);
+    expect(m1Usage.freeCreditsRemaining).toBe(4);
 
-    const usage = await getUserUsage(userId);
-    expect(usage.permanentCreditsTotal).toBe(10);
-    expect(usage.permanentCreditsUsed).toBe(2);
-    expect(usage.permanentCreditsRemaining).toBe(8); // Survives into month 2!
-    expect(usage.monthlyCreditsRemaining).toBe(3); // Plus 3 monthly credits
-    expect(usage.totalRemainingCredits).toBe(11);
-  });
-
-  it("4. Month 2 grants exactly 3 monthly credits", async () => {
-    const userId = "test-user-4";
-    const now = new Date();
-    const signupDate = addMonths(now, -1); // 1 month ago -> Month 2
-    setInMemoryUserCreatedAt(userId, signupDate);
-
-    const usage = await getUserUsage(userId);
-    expect(usage.isInitialMonth).toBe(false);
-    expect(usage.monthlyCreditsAllowance).toBe(3);
-    expect(usage.monthlyCreditsRemaining).toBe(3);
-    expect(usage.permanentCreditsRemaining).toBe(10);
-    expect(usage.totalRemainingCredits).toBe(13); // 10 permanent + 3 monthly
-  });
-
-  it("5. Monthly credits reset to 3 in month 3", async () => {
-    const userId = "test-user-5";
-    const now = new Date();
-    const signupDate = addMonths(now, -2); // 2 months ago -> Month 3
-    setInMemoryUserCreatedAt(userId, signupDate);
-
-    const usage = await getUserUsage(userId);
-    expect(usage.monthlyCreditsAllowance).toBe(3);
-    expect(usage.monthlyCreditsRemaining).toBe(3);
-  });
-
-  it("6. Unused monthly credits do not roll over", async () => {
-    const userId = "test-user-6";
-    const now = new Date();
-    
-    // Month 2 simulation
+    // Advance user to Month 2 (1 month ago)
     const month2Signup = addMonths(now, -1);
     setInMemoryUserCreatedAt(userId, month2Signup);
 
-    // User gets 3 monthly credits in month 2, consumes 1 monthly credit
-    await consumeUsage(userId, "CONTENT_GENERATION", 1);
     const m2Usage = await getUserUsage(userId);
-    expect(m2Usage.monthlyCreditsRemaining).toBe(2);
+    expect(m2Usage.isInitialMonth).toBe(false);
+    expect(m2Usage.freeCreditsTotal).toBe(3); // Resets to 3!
+    expect(m2Usage.freeCreditsUsed).toBe(0); // Used resets to 0!
+    expect(m2Usage.freeCreditsRemaining).toBe(3); // Exactly 3 remaining (NOT 7, NOT 4)
+  });
 
-    // Advance user to Month 3 (2 months ago) and simulate new month boundary reset
+  it("3. User consuming 2/3 in Month 2 receives exactly 3 credits in Month 3", async () => {
+    const userId = "test-user-3";
+    const now = new Date();
+    
+    // Month 2 setup
+    const month2Signup = addMonths(now, -1);
+    setInMemoryUserCreatedAt(userId, month2Signup);
+
+    await getUserUsage(userId);
+    // Consume 2 credits in Month 2
+    await consumeUsage(userId, "CONTENT_GENERATION", 2);
+    const m2Usage = await getUserUsage(userId);
+    expect(m2Usage.freeCreditsRemaining).toBe(1);
+
+    // Advance to Month 3 (2 months ago)
     const month3Signup = addMonths(now, -2);
     setInMemoryUserCreatedAt(userId, month3Signup);
 
-    // Reset lastMonthlyReset to force Month 3 lazy reset
-    const usage = await getUserUsage(userId);
-    // Force reset simulation for new cycle
-    const cycleStartMonth3 = addMonths(month3Signup, 2);
-    if (!usage.nextMonthlyResetDate) {
-      // noop
-    }
-
-    // Force lazy reset call under month 3 cycle
     const m3Usage = await getUserUsage(userId);
-    expect(m3Usage.monthlyCreditsAllowance).toBe(3);
-    expect(m3Usage.monthlyCreditsRemaining).toBeLessThanOrEqual(3);
+    expect(m3Usage.freeCreditsTotal).toBe(3);
+    expect(m3Usage.freeCreditsUsed).toBe(0);
+    expect(m3Usage.freeCreditsRemaining).toBe(3); // Resets to 3!
   });
 
-  it("7. Permanent credits continue surviving monthly resets", async () => {
-    const userId = "test-user-7";
+  it("4. Unused Month 1 credits expire completely if 0 credits are used", async () => {
+    const userId = "test-user-4";
     const now = new Date();
-    const signupDate = addMonths(now, -3); // Month 4
-    setInMemoryUserCreatedAt(userId, signupDate);
+    setInMemoryUserCreatedAt(userId, now);
 
-    // Consume 3 credits (draws from monthly first)
-    await consumeUsage(userId, "CONTENT_GENERATION", 3);
+    // 0 credits used in Month 1
+    const m1Usage = await getUserUsage(userId);
+    expect(m1Usage.freeCreditsRemaining).toBe(10);
 
-    const usage = await getUserUsage(userId);
-    expect(usage.permanentCreditsRemaining).toBe(10); // Untouched permanent credits!
-    expect(usage.monthlyCreditsRemaining).toBe(0); // Consumed monthly credits
+    // Move to Month 2
+    setInMemoryUserCreatedAt(userId, addMonths(now, -1));
+
+    const m2Usage = await getUserUsage(userId);
+    expect(m2Usage.freeCreditsTotal).toBe(3);
+    expect(m2Usage.freeCreditsRemaining).toBe(3); // Resets to 3 (does NOT carry over to 10 + 3 = 13)
   });
 
-  it("8. Permanent credits can eventually reach 0", async () => {
-    const userId = "test-user-8";
-    // Consume all 10 initial permanent credits in Month 1
-    await consumeUsage(userId, "CONTENT_GENERATION", 10);
-
-    const usageAfter = await getUserUsage(userId);
-    expect(usageAfter.permanentCreditsRemaining).toBe(0);
-    expect(usageAfter.totalRemainingCredits).toBe(0);
-  });
-
-  it("9. User still receives 3 monthly credits after permanent credits reach 0", async () => {
-    const userId = "test-user-9";
-    // Consume all 10 permanent credits
-    await consumeUsage(userId, "CONTENT_GENERATION", 10);
-
-    // Move user into Month 2
+  it("5. Repeated API calls do not alter allowance or grant extra credits", async () => {
+    const userId = "test-user-5";
     const now = new Date();
-    const signupDate = addMonths(now, -1);
-    setInMemoryUserCreatedAt(userId, signupDate);
+    setInMemoryUserCreatedAt(userId, addMonths(now, -1)); // Month 2
 
-    const usageMonth2 = await getUserUsage(userId);
-    expect(usageMonth2.permanentCreditsRemaining).toBe(0);
-    expect(usageMonth2.monthlyCreditsRemaining).toBe(3);
-    expect(usageMonth2.totalRemainingCredits).toBe(3);
+    const u1 = await getUserUsage(userId);
+    const u2 = await getUserUsage(userId);
+    const u3 = await getUserUsage(userId);
+
+    expect(u1.freeCreditsTotal).toBe(3);
+    expect(u2.freeCreditsTotal).toBe(3);
+    expect(u3.freeCreditsTotal).toBe(3);
   });
 
-  it("10. Repeated API calls do not grant duplicate monthly credits", async () => {
-    const userId = "test-user-10";
+  it("6. Concurrent credit consumption is thread-safe and atomic", async () => {
+    const userId = "test-user-6";
     const now = new Date();
-    const signupDate = addMonths(now, -1);
-    setInMemoryUserCreatedAt(userId, signupDate);
+    setInMemoryUserCreatedAt(userId, addMonths(now, -1)); // Month 2 (3 credits)
 
-    const usage1 = await getUserUsage(userId);
-    const usage2 = await getUserUsage(userId);
-    const usage3 = await getUserUsage(userId);
-
-    expect(usage1.monthlyCreditsRemaining).toBe(3);
-    expect(usage2.monthlyCreditsRemaining).toBe(3);
-    expect(usage3.monthlyCreditsRemaining).toBe(3);
-  });
-
-  it("11. Concurrent usage/reset operations are safe", async () => {
-    const userId = "test-user-11";
-    const now = new Date();
-    const signupDate = addMonths(now, -1);
-    setInMemoryUserCreatedAt(userId, signupDate);
-
-    // Run 3 concurrent credit consumption calls
     const results = await Promise.all([
       consumeUsage(userId, "CONTENT_GENERATION", 1),
       consumeUsage(userId, "CONTENT_GENERATION", 1),
@@ -254,13 +187,14 @@ describe("Finalized FREE Credit System (Scenarios 1-14)", () => {
 
     expect(results).toHaveLength(3);
     const finalUsage = await getUserUsage(userId);
-    // 3 monthly credits were consumed, permanent 10 credits remaining
-    expect(finalUsage.monthlyCreditsRemaining).toBe(0);
-    expect(finalUsage.permanentCreditsRemaining).toBe(10);
-    expect(finalUsage.totalRemainingCredits).toBe(10);
+    expect(finalUsage.freeCreditsUsed).toBe(3);
+    expect(finalUsage.freeCreditsRemaining).toBe(0);
+
+    // 4th consumption should throw PLAN_LIMIT_REACHED
+    await expect(consumeUsage(userId, "CONTENT_GENERATION", 1)).rejects.toThrow("PLAN_LIMIT_REACHED");
   });
 
-  it("12. Paid subscriptions are unaffected", async () => {
+  it("7. Paid subscriptions are unaffected by free cycle resets", async () => {
     const userId = "test-user-paid";
     await updateUserSubscriptionState(userId, { plan: "PRO", status: "ACTIVE" });
 
@@ -268,29 +202,17 @@ describe("Finalized FREE Credit System (Scenarios 1-14)", () => {
     expect(plan).toBe("PRO");
 
     const usage = await getUserUsage(userId);
-    expect(usage.monthlyCreditsAllowance).toBe(50);
-    expect(usage.permanentCreditsRemaining).toBe(10); // Permanent credits preserved
+    expect(usage.freeCreditsTotal).toBe(50);
   });
 
-  it("13. Admin-granted subscriptions are unaffected", async () => {
-    const userId = "test-user-admin-grant";
-    await updateUserSubscriptionState(userId, {
-      plan: "BUSINESS",
-      status: "ACTIVE",
-    });
+  it("8. Admin-granted subscriptions remain active with tier limits", async () => {
+    const userId = "test-user-admin";
+    await updateUserSubscriptionState(userId, { plan: "BUSINESS", status: "ACTIVE" });
 
     const sub = await getUserSubscription(userId);
     expect(sub.plan).toBe("BUSINESS");
 
     const usage = await getUserUsage(userId);
-    expect(usage.monthlyCreditsAllowance).toBe(500);
-    expect(usage.permanentCreditsRemaining).toBe(10); // Permanent credits preserved
-  });
-
-  it("14. Existing authentication remains unaffected", async () => {
-    const userId = "demo-user-id";
-    const usage = await getUserUsage(userId);
-    expect(usage.permanentCreditsTotal).toBe(10);
-    expect(usage.totalRemainingCredits).toBeGreaterThanOrEqual(10);
+    expect(usage.freeCreditsTotal).toBe(500);
   });
 });

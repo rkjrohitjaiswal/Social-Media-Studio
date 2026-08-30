@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Coins, RotateCcw, AlertTriangle, Loader2 } from "lucide-react";
+import { Zap, AlertTriangle, Loader2 } from "lucide-react";
 import { useStudio } from "@/lib/studio-context";
 
 export interface UsageData {
@@ -10,13 +10,7 @@ export interface UsageData {
   usedCredits: number;
   remainingCredits: number;
   resetPeriod?: string;
-  totalRemainingCredits?: number;
-  permanentRemainingCredits?: number;
-  permanentTotalCredits?: number;
-  permanentUsedCredits?: number;
-  monthlyRemainingCredits?: number;
-  monthlyAllowance?: number;
-  monthlyUsedCredits?: number;
+  isInitialMonth?: boolean;
 }
 
 export function UsageWidget() {
@@ -46,59 +40,43 @@ export function UsageWidget() {
     );
   }
 
-  const totalRemaining = usage.totalRemainingCredits ?? usage.remainingCredits ?? 0;
-  const permRemaining = usage.permanentRemainingCredits ?? usage.remainingCredits ?? 0;
-  const permTotal = usage.permanentTotalCredits ?? 10;
-  const monthlyRemaining = usage.monthlyRemainingCredits ?? 0;
-  const monthlyAllowance = usage.monthlyAllowance ?? 3;
-  const isExhausted = totalRemaining <= 0;
+  const limit = usage.monthlyLimit ?? 10;
+  const used = usage.usedCredits ?? 0;
+  const remaining = usage.remainingCredits ?? Math.max(0, limit - used);
+  const isExhausted = remaining <= 0;
+  const progressPercent = Math.min(100, Math.round((used / limit) * 100));
 
   return (
-    <div className="glass-card p-5 rounded-2xl space-y-4 border-[#c5a059]/30">
-      <div className="flex items-center justify-between border-b border-white/10 pb-3">
-        <span className="text-xs font-mono font-bold uppercase tracking-wider text-[#9e9d98]">
-          Available Credits ({usage.plan})
-        </span>
-        <span className="text-sm font-bold text-[#f5f4f0]">
-          {totalRemaining} Total Available
+    <div className="glass-card p-5 rounded-2xl space-y-3.5 border-[#c5a059]/30">
+      <div className="flex items-center justify-between text-xs font-mono font-bold uppercase tracking-wider text-[#9e9d98]">
+        <div className="flex items-center gap-1.5 text-[#c5a059]">
+          <Zap className="w-4 h-4 fill-[#c5a059]" />
+          <span>Workspace Credits ({usage.plan})</span>
+        </div>
+        <span className="text-[#f5f4f0]">
+          {remaining} / {limit} Available
         </span>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 text-xs">
-        {/* PERMANENT CREDITS */}
-        <div className="p-3 rounded-xl bg-[#0b0c0e] border border-[#D4AF37]/30 space-y-1">
-          <div className="flex items-center justify-between text-[#D4AF37]">
-            <span className="flex items-center gap-1 font-semibold text-[11px]">
-              <Coins className="w-3.5 h-3.5 shrink-0" />
-              Permanent
-            </span>
-            <span className="text-[10px] opacity-70">Never Expires</span>
-          </div>
-          <div className="text-lg font-bold text-[#f5f4f0] font-mono">
-            {permRemaining} <span className="text-xs font-normal text-[#9e9d98]">/ {permTotal}</span>
-          </div>
-        </div>
-
-        {/* MONTHLY FREE CREDITS */}
-        <div className="p-3 rounded-xl bg-[#0b0c0e] border border-cyan-500/30 space-y-1">
-          <div className="flex items-center justify-between text-cyan-400">
-            <span className="flex items-center gap-1 font-semibold text-[11px]">
-              <RotateCcw className="w-3.5 h-3.5 shrink-0" />
-              Monthly Free
-            </span>
-            <span className="text-[10px] opacity-70">Renewable</span>
-          </div>
-          <div className="text-lg font-bold text-[#f5f4f0] font-mono">
-            {monthlyRemaining} <span className="text-xs font-normal text-[#9e9d98]">/ {monthlyAllowance}</span>
-          </div>
-        </div>
+      <div className="w-full bg-[#0b0c0e] h-2 rounded-full overflow-hidden border border-white/5">
+        <div
+          className={`h-full transition-all duration-300 ${
+            isExhausted ? "bg-red-500" : progressPercent > 80 ? "bg-amber-500" : "bg-[#c5a059]"
+          }`}
+          style={{ width: `${progressPercent}%` }}
+        />
       </div>
 
-      {isExhausted && (
-        <div className="text-center text-xs text-red-400 font-bold">
-          Credits Exhausted — Upgrade Plan to Continue
-        </div>
-      )}
+      <div className="flex items-center justify-between text-[11px] text-[#9e9d98]">
+        <span>
+          Used: <strong className="text-[#f5f4f0]">{used}</strong> | Remaining: <strong className="text-[#f5f4f0]">{remaining}</strong>
+        </span>
+        {isExhausted ? (
+          <span className="text-red-400 font-bold">Credits Exhausted — Upgrade Plan</span>
+        ) : (
+          <span>{usage.isInitialMonth ? "First Month: 10 Credits" : "Cycle: 3 Credits/Month"}</span>
+        )}
+      </div>
     </div>
   );
 }

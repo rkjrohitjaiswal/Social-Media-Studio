@@ -138,10 +138,10 @@ describe("5-Tier SaaS Platform Comprehensive Suite (50 Scenarios)", () => {
       await expect(consumeUsage(userId, "CONTENT_GENERATION")).rejects.toThrow("PLAN_LIMIT_REACHED");
     });
 
-    it("13. Free usage provides permanent credits + 3 monthly renewable credits", async () => {
+    it("13. Free usage provides 10 credits in month 1 then 3 credits monthly", async () => {
       const plan = await getUserPlan("user-free-noreset");
       expect(plan).toBe("FREE");
-      expect(SAAS_PLANS_REGISTRY.FREE.description).toContain("10 permanent free credits");
+      expect(SAAS_PLANS_REGISTRY.FREE.description).toContain("10 free credits for your first month");
     });
   });
 

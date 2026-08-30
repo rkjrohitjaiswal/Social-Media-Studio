@@ -42,7 +42,7 @@ export const SAAS_PLANS_REGISTRY: Record<SubscriptionPlan, PlanDefinition> = {
     socialAccountLimit: 1,
     rateLimitPerHour: 10,
     features: ["BASIC_SCHEDULING", "BASIC_ANALYTICS"],
-    description: "10 permanent free credits + 3 free credits every month after your first month.",
+    description: "10 free credits for your first month, then 3 free credits every month after.",
   },
   PRO: {
     id: "PRO",
