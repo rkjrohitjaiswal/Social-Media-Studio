@@ -8,12 +8,13 @@ export const subscriptionStatusSchema = z.enum(["TRIAL", "ACTIVE", "PAST_DUE", "
 export type SubscriptionStatus = z.infer<typeof subscriptionStatusSchema>;
 
 export interface BillingStatusResponse {
-  plan: SubscriptionPlan;
+  plan: SubscriptionPlan | string;
   status: SubscriptionStatus;
   priceInr: number;
-  monthlyWorkflowsLimit: number;
+  monthlyWorkflowsLimit: number | string;
   workflowsUsed: number;
-  workflowsRemaining: number;
+  workflowsRemaining: number | string;
+  isUnlimited?: boolean;
   socialAccountLimit: number;
   socialAccountsConnected: number;
   rateLimitPerHour: number;

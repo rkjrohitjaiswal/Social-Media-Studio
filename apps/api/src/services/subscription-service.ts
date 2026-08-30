@@ -1,7 +1,7 @@
 import prisma from "@ai-social/database";
 import { SubscriptionPlan, SAAS_PLANS_REGISTRY, BillingStatusResponse, SubscriptionStatus } from "@ai-social/shared";
 import { PLAN_PRICES } from "../config/billing.js";
-import { getUserUsage } from "./usage-service.js";
+import { getUserUsage, isUnlimitedUser } from "./usage-service.js";
 
 export interface StoredSubscription {
   userId: string;
@@ -149,19 +149,21 @@ export async function updateUserSubscriptionState(
 export async function getFullBillingDetails(userId: string): Promise<BillingStatusResponse> {
   const sub = await getUserSubscription(userId);
   const usage = await getUserUsage(userId);
+  const isUnlimited = await isUnlimitedUser(userId);
   const activePlan = (await isPaidUser(userId)) ? sub.plan : "FREE";
   const entitlements = SAAS_PLANS_REGISTRY[activePlan] || SAAS_PLANS_REGISTRY.FREE;
 
   return {
     plan: activePlan,
+    isUnlimited,
     status: sub.status,
     priceInr: PLAN_PRICES[activePlan] || 0,
-    monthlyWorkflowsLimit: entitlements.monthlyWorkflows,
+    monthlyWorkflowsLimit: isUnlimited ? "Unlimited" : entitlements.monthlyWorkflows,
     workflowsUsed: usage.freeCreditsUsed,
-    workflowsRemaining: usage.freeCreditsRemaining,
-    socialAccountLimit: entitlements.socialAccountLimit,
+    workflowsRemaining: isUnlimited ? "Unlimited" : usage.freeCreditsRemaining,
+    socialAccountLimit: isUnlimited ? 999 : entitlements.socialAccountLimit,
     socialAccountsConnected: 1, // Query active connected accounts in real DB
-    rateLimitPerHour: entitlements.rateLimitPerHour,
+    rateLimitPerHour: isUnlimited ? 9999 : entitlements.rateLimitPerHour,
     features: entitlements.features,
     currentPeriodStart: sub.currentPeriodStart ? sub.currentPeriodStart.toISOString() : null,
     currentPeriodEnd: sub.currentPeriodEnd ? sub.currentPeriodEnd.toISOString() : null,

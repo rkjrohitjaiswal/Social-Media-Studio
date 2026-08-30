@@ -134,10 +134,12 @@ export default function BillingSettingsPage() {
           <div className="p-4 rounded-2xl bg-[#0b0c0e] border border-white/5 space-y-2">
             <div className="text-[#9e9d98]">Workflow Usage</div>
             <div className="text-lg font-bold font-mono text-[#f5f4f0]">
-              {billingStatus?.workflowsUsed ?? 0} / {billingStatus?.monthlyWorkflowsLimit ?? 3}
+              {billingStatus?.workflowsUsed ?? 0} / {billingStatus?.isUnlimited || billingStatus?.monthlyWorkflowsLimit === "Unlimited" ? "Unlimited" : (billingStatus?.monthlyWorkflowsLimit ?? 3)}
             </div>
             <div className="text-[11px] text-[#4e8765]">
-              {billingStatus?.workflowsRemaining ?? 3} workflows remaining
+              {billingStatus?.isUnlimited || billingStatus?.workflowsRemaining === "Unlimited"
+                ? "∞ Unlimited workflows available"
+                : `${billingStatus?.workflowsRemaining ?? 3} workflows remaining`}
             </div>
           </div>
 

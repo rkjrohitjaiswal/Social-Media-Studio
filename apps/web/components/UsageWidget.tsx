@@ -1,14 +1,15 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Zap, AlertTriangle, Loader2 } from "lucide-react";
+import { Zap, AlertTriangle, Loader2, Crown } from "lucide-react";
 import { getAuthHeader } from "@/lib/api-client";
 
 export interface UsageData {
   plan: string;
-  monthlyLimit: number;
+  monthlyLimit: number | string;
   usedCredits: number;
-  remainingCredits: number;
+  remainingCredits: number | string;
+  isUnlimited?: boolean;
   resetPeriod?: string;
 }
 
@@ -70,22 +71,28 @@ export function UsageWidget() {
     );
   }
 
-  const percentUsed = Math.min(
-    100,
-    Math.round((usage.usedCredits / Math.max(1, usage.monthlyLimit)) * 100)
-  );
+  const isUnlimited = usage.isUnlimited || usage.remainingCredits === "Unlimited" || usage.monthlyLimit === "Unlimited";
 
-  const isExhausted = usage.remainingCredits <= 0;
+  const numLimit = typeof usage.monthlyLimit === "number" ? usage.monthlyLimit : 1;
+  const percentUsed = isUnlimited
+    ? 100
+    : Math.min(100, Math.round((usage.usedCredits / Math.max(1, numLimit)) * 100));
+
+  const isExhausted = !isUnlimited && typeof usage.remainingCredits === "number" && usage.remainingCredits <= 0;
 
   return (
     <div className="glass-card p-5 rounded-2xl space-y-3 border-[#c5a059]/30">
       <div className="flex items-center justify-between text-xs font-mono font-bold uppercase tracking-wider text-[#9e9d98]">
         <div className="flex items-center gap-1.5 text-[#c5a059]">
-          <Zap className="w-4 h-4 fill-[#c5a059]" />
+          {isUnlimited ? (
+            <Crown className="w-4 h-4 text-[#D4AF37]" />
+          ) : (
+            <Zap className="w-4 h-4 fill-[#c5a059]" />
+          )}
           <span>Workspace Credits ({usage.plan})</span>
         </div>
         <span className="text-[#f5f4f0]">
-          {usage.remainingCredits} / {usage.monthlyLimit} Available
+          {isUnlimited ? "Unlimited" : `${usage.remainingCredits} / ${usage.monthlyLimit}`} Available
         </span>
       </div>
 
@@ -93,7 +100,13 @@ export function UsageWidget() {
       <div className="w-full bg-white/10 h-2 rounded-full overflow-hidden">
         <div
           className={`h-full transition-all duration-500 ${
-            isExhausted ? "bg-red-500" : percentUsed > 80 ? "bg-amber-500" : "bg-[#c5a059]"
+            isUnlimited
+              ? "bg-gradient-to-r from-[#D4AF37] to-[#C5A059]"
+              : isExhausted
+              ? "bg-red-500"
+              : percentUsed > 80
+              ? "bg-amber-500"
+              : "bg-[#c5a059]"
           }`}
           style={{ width: `${percentUsed}%` }}
         />
@@ -101,7 +114,11 @@ export function UsageWidget() {
 
       <div className="flex items-center justify-between text-[11px] text-[#9e9d98]">
         <span>Used: {usage.usedCredits} credits</span>
-        {isExhausted ? (
+        {isUnlimited ? (
+          <span className="text-[#D4AF37] font-bold flex items-center gap-1">
+            <span>∞ Unlimited</span>
+          </span>
+        ) : isExhausted ? (
           <span className="text-red-400 font-bold">Credits Exhausted — Upgrade Plan</span>
         ) : (
           <span>{usage.remainingCredits} remaining this cycle</span>
