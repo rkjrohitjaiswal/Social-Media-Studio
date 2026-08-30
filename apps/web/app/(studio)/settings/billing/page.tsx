@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { CreditCard, Sparkles, Check, AlertCircle, ArrowLeft } from "lucide-react";
+import { CreditCard, Sparkles, Check, AlertCircle, ArrowLeft, Coins, RotateCcw } from "lucide-react";
 import { getBillingStatus, cancelSubscription } from "@/lib/api-client";
 import { BillingStatusResponse, SubscriptionPlan, SAAS_PLANS_REGISTRY } from "@ai-social/shared";
 import { handleRazorpaySubscribeFlow } from "@/lib/razorpay-checkout";
@@ -79,6 +79,12 @@ export default function BillingSettingsPage() {
     }
   };
 
+  const totalRemaining = billingStatus?.totalRemainingCredits ?? billingStatus?.workflowsRemaining ?? 0;
+  const permRemaining = billingStatus?.permanentRemainingCredits ?? billingStatus?.workflowsRemaining ?? 0;
+  const permTotal = billingStatus?.permanentTotalCredits ?? 10;
+  const monthlyRemaining = billingStatus?.monthlyRemainingCredits ?? 0;
+  const monthlyAllowance = billingStatus?.monthlyAllowance ?? (billingStatus?.plan === "FREE" ? 3 : billingStatus?.monthlyWorkflowsLimit ?? 0);
+
   return (
     <div className="space-y-8 pb-12 max-w-5xl">
       {/* HEADER */}
@@ -115,7 +121,7 @@ export default function BillingSettingsPage() {
       )}
 
       {/* ACTIVE PLAN METRICS DASHBOARD */}
-      <div className="glass-card p-6 rounded-3xl space-y-4 border border-[#c5a059]/30">
+      <div className="glass-card p-6 rounded-3xl space-y-5 border border-[#c5a059]/30">
         <div className="flex items-center justify-between border-b border-white/10 pb-3">
           <div>
             <h3 className="font-semibold text-base text-[#f5f4f0] flex items-center gap-2">
@@ -145,20 +151,56 @@ export default function BillingSettingsPage() {
             <p>10 permanent free credits + 3 free credits every month after your first month.</p>
           </div>
         )}
-
+        {/* DISTINCT CREDIT CARDS BREAKDOWN */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
-          <div className="p-4 rounded-2xl bg-[#0b0c0e] border border-white/5 space-y-2">
-            <div className="text-[#9e9d98]">Workflow Usage</div>
-            <div className="text-lg font-bold font-mono text-[#f5f4f0]">
-              {billingStatus?.totalRemainingCredits ?? billingStatus?.workflowsRemaining ?? 10} Available
+          {/* TOTAL AVAILABLE */}
+          <div className="p-4 rounded-2xl bg-[#0b0c0e] border border-white/10 space-y-2">
+            <div className="flex items-center justify-between text-[#9e9d98]">
+              <span>Total Available</span>
+              <Sparkles className="w-4 h-4 text-[#c5a059]" />
             </div>
-            <div className="text-[11px] text-[#4e8765]">
-              {billingStatus?.permanentRemainingCredits !== undefined
-                ? `Perm: ${billingStatus.permanentRemainingCredits} | Monthly: ${billingStatus.monthlyRemainingCredits ?? 0}`
-                : `${billingStatus?.workflowsRemaining ?? 10} credits remaining`}
+            <div className="text-2xl font-bold font-mono text-[#f5f4f0]">
+              {totalRemaining} <span className="text-xs font-normal text-[#9e9d98]">credits</span>
+            </div>
+            <div className="text-[11px] text-[#9e9d98]">
+              {permRemaining} Permanent + {monthlyRemaining} Monthly Free
             </div>
           </div>
 
+          {/* PERMANENT CREDITS */}
+          <div className="p-4 rounded-2xl bg-[#0b0c0e] border border-[#D4AF37]/30 space-y-2">
+            <div className="flex items-center justify-between text-[#D4AF37]">
+              <span className="font-semibold flex items-center gap-1.5">
+                <Coins className="w-4 h-4" /> Permanent Credits
+              </span>
+              <span className="text-[10px] opacity-70">Never Reset</span>
+            </div>
+            <div className="text-2xl font-bold font-mono text-[#f5f4f0]">
+              {permRemaining} <span className="text-xs font-normal text-[#9e9d98]">remaining</span>
+            </div>
+            <div className="text-[11px] text-[#9e9d98]">
+              {permTotal} total permanent grant
+            </div>
+          </div>
+
+          {/* MONTHLY FREE CREDITS */}
+          <div className="p-4 rounded-2xl bg-[#0b0c0e] border border-cyan-500/30 space-y-2">
+            <div className="flex items-center justify-between text-cyan-400">
+              <span className="font-semibold flex items-center gap-1.5">
+                <RotateCcw className="w-4 h-4" /> Monthly Free Credits
+              </span>
+              <span className="text-[10px] opacity-70">Resets Monthly</span>
+            </div>
+            <div className="text-2xl font-bold font-mono text-[#f5f4f0]">
+              {monthlyRemaining} <span className="text-xs font-normal text-[#9e9d98]">remaining</span>
+            </div>
+            <div className="text-[11px] text-[#9e9d98]">
+              {monthlyAllowance} monthly allowance
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs pt-2">
           <div className="p-4 rounded-2xl bg-[#0b0c0e] border border-white/5 space-y-2">
             <div className="text-[#9e9d98]">Connected Social Accounts</div>
             <div className="text-lg font-bold font-mono text-[#f5f4f0]">
