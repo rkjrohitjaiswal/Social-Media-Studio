@@ -13,7 +13,11 @@ import {
   CreateWorkspaceInput,
   WorkspaceResponse,
   ApprovalRequestResponse,
+  NotificationItem,
 } from "@ai-social/shared";
+
+// Re-export for consumers that import from this file
+export type { NotificationItem };
 
 // Reads the active workspace ID from localStorage (set by StudioContext on switch).
 // Falls back to "demo-workspace-1" for SSR / unauthenticated dev sessions.
@@ -331,4 +335,58 @@ export async function uploadReferenceImage(file: File): Promise<{ url: string }>
     reader.onerror = () => reject(new Error("Failed to read file"));
     reader.readAsDataURL(file);
   });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Notifications API
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Fetch the current user's most recent notifications (newest first).
+ * Throws on network/server error so callers can display an error state.
+ */
+export async function fetchNotifications(): Promise<NotificationItem[]> {
+  const res = await apiFetch("/api/notifications");
+  if (!res.ok) throw new Error(`Failed to fetch notifications: ${res.status}`);
+  const body = (await res.json() as any);
+  return body.notifications ?? [];
+}
+
+/** Fetch the unread notification count for the current user. */
+export async function fetchUnreadNotificationCount(): Promise<number> {
+  try {
+    const res = await apiFetch("/api/notifications/unread-count");
+    if (!res.ok) return 0;
+    const body = (await res.json() as any);
+    return body.unreadCount ?? 0;
+  } catch {
+    return 0;
+  }
+}
+
+/** Mark a single notification as read. */
+export async function markNotificationAsRead(id: string): Promise<void> {
+  try {
+    await apiFetch(`/api/notifications/${id}/read`, { method: "PATCH" });
+  } catch {
+    // Non-fatal
+  }
+}
+
+/** Mark all notifications as read. */
+export async function markAllNotificationsAsRead(): Promise<void> {
+  try {
+    await apiFetch("/api/notifications/mark-all-read", { method: "PATCH" });
+  } catch {
+    // Non-fatal
+  }
+}
+
+/** Delete/dismiss a notification. */
+export async function deleteNotificationApi(id: string): Promise<void> {
+  try {
+    await apiFetch(`/api/notifications/${id}`, { method: "DELETE" });
+  } catch {
+    // Non-fatal
+  }
 }

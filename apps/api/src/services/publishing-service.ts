@@ -3,6 +3,7 @@ import { dispatchWebhookEvent } from "./webhook-service.js";
 import { hasConnectedSocialAccount } from "./social-account-service.js";
 import { consumePublishingCredit } from "./usage-service.js";
 import { resolveSocialPublishingProvider } from "../integrations/publishing/social-publishing-provider.js";
+import { createNotification } from "./notification-service.js";
 
 export interface ExecutionOptions {
   workspaceId?: string;
@@ -153,6 +154,19 @@ export async function executeDueScheduledPosts(
         } catch {
           // Fallback
         }
+        if (scheduledPost.userId) {
+          createNotification({
+            userId: scheduledPost.userId,
+            workspaceId: targetWorkspaceId,
+            type: "PUBLISH_FAILED",
+            title: `${scheduledPost.platform} Post Failed`,
+            message: `No connected ${scheduledPost.platform} account found. Connect your account to publish.`,
+            actionUrl: "/integrations",
+            entityType: "scheduled_post",
+            entityId: scheduledPost.id,
+            metadata: { scheduledPostId: scheduledPost.id },
+          });
+        }
         continue;
       }
 
@@ -180,6 +194,19 @@ export async function executeDueScheduledPosts(
           });
         } catch {
           // Fallback
+        }
+        if (scheduledPost.userId) {
+          createNotification({
+            userId: scheduledPost.userId,
+            workspaceId: targetWorkspaceId,
+            type: "PUBLISH_FAILED",
+            title: `${scheduledPost.platform} Post Failed to Publish`,
+            message: pubRes.error || "Publishing provider execution failed.",
+            actionUrl: "/publish-queue",
+            entityType: "scheduled_post",
+            entityId: scheduledPost.id,
+            metadata: { scheduledPostId: scheduledPost.id },
+          });
         }
         continue;
       }
@@ -283,6 +310,23 @@ export async function executeDueScheduledPosts(
         );
       } catch {
         // Webhook error isolation: Never roll back successful publication
+      }
+
+      // Notify user of successful publish
+      if (scheduledPost.userId) {
+        createNotification({
+          userId: scheduledPost.userId,
+          workspaceId: targetWorkspaceId,
+          type: "PUBLISH_SUCCESS",
+          title: `${scheduledPost.platform} Post Published Successfully`,
+          message: scheduledPost.caption
+            ? `"${scheduledPost.caption.slice(0, 60)}${scheduledPost.caption.length > 60 ? "..." : ""}"`
+            : undefined,
+          actionUrl: permalink,
+          entityType: "published_post",
+          entityId: publishedPostId,
+          metadata: { publishedPostId, scheduledPostId: scheduledPost.id, platform: scheduledPost.platform },
+        });
       }
 
       summary.publishedCount++;

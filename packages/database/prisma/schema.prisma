@@ -2,8 +2,19 @@ datasource db {
   provider = "postgresql"
 }
 
+
 generator client {
   provider = "prisma-client-js"
+}
+
+enum NotificationType {
+  GENERATION_COMPLETED
+  GENERATION_FAILED
+  PUBLISH_SUCCESS
+  PUBLISH_FAILED
+  QUALITY_ALERT
+  APPROVAL_REQUEST
+  SYSTEM
 }
 
 enum Role {
@@ -187,6 +198,32 @@ model User {
   performanceInsights PerformanceInsight[]
   trendOpportunities TrendOpportunity[]
   scheduledPosts      ScheduledPost[]
+  notifications       Notification[]
+}
+
+model Notification {
+  id           String           @id @default(uuid())
+  userId       String
+  user         User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspaceId  String?
+  type         NotificationType @default(SYSTEM)
+  title        String
+  message      String?
+  read         Boolean          @default(false)
+  readAt       DateTime?
+  entityType   String?
+  entityId     String?
+  actionUrl    String?
+  metadataJson Json?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  @@index([userId])
+  @@index([userId, read])
+  @@index([userId, createdAt])
+  @@index([userId, read, createdAt])
+  @@index([workspaceId])
+  @@map("notifications")
 }
 
 model Workspace {

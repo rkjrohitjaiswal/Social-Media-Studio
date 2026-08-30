@@ -6,6 +6,7 @@ import {
 } from "../integrations/ai/quality-provider";
 import { dispatchN8nEvent } from "../integrations/n8n/event-dispatcher";
 import { getUserOpenAIApiKey } from "../services/credential-resolver.js";
+import { createNotification } from "../services/notification-service.js";
 
 export interface QueueQualityState {
   id: string;
@@ -232,6 +233,20 @@ async function executeQualityWorkerJob(
         verdict: result.verdict,
       },
     }).catch(() => {});
+
+    if (params.userId && (result.verdict !== "PASS" || result.overallScore < 85)) {
+      createNotification({
+        userId: params.userId,
+        workspaceId: params.workspaceId,
+        type: "QUALITY_ALERT",
+        title: `Quality Alert: ${result.overallScore}/100 (${result.verdict})`,
+        message: `Asset in ${params.campaignName} scored ${result.overallScore}/100 and requires review.`,
+        actionUrl: "/content-studio",
+        entityType: "quality_assessment",
+        entityId: assessment.id,
+        metadata: { score: result.overallScore, verdict: result.verdict },
+      });
+    }
   } catch (err: unknown) {
     assessment.status = "FAILED";
     assessment.errorMessage = err instanceof Error ? err.message : "Quality analysis failed";

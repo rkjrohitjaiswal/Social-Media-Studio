@@ -1,6 +1,13 @@
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
 import { WorkspaceResponse } from "@ai-social/shared";
 import { getWorkspaces } from "./api-client";
+import {
+  fetchNotifications,
+  markAllNotificationsAsRead,
+  markNotificationAsRead,
+  NotificationItem,
+} from "./api-client";
+import { createClient } from "./supabase/client";
 import {
   Brand,
   Campaign,
@@ -39,8 +46,13 @@ interface StudioContextType {
   regenerateAssetVersion: (assetId: string, customPrompt: string) => void;
   scheduledPosts: ScheduledPost[];
   scheduleAssetToInstagram: (assetId: string, dateIso: string) => void;
-  notifications: { id: string; title: string; time: string; read: boolean }[];
+  notifications: NotificationItem[];
+  unreadCount: number;
+  isLoadingNotifications: boolean;
+  notifError: string | null;
   markNotificationsRead: () => void;
+  markOneNotificationRead: (id: string) => void;
+  refreshNotifications: () => Promise<void>;
   workspaces: WorkspaceResponse[];
   activeWorkspace: WorkspaceResponse | null;
   setActiveWorkspace: (ws: WorkspaceResponse) => void;
@@ -118,26 +130,79 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const [notifications, setNotifications] = useState([
-    {
-      id: "n-1",
-      title: "Batch Generation Completed: 4/4 Assets Ready for Review",
-      time: "10m ago",
-      read: false,
-    },
-    {
-      id: "n-2",
-      title: "Instagram Post Published: Spring High Couture 2026",
-      time: "2h ago",
-      read: false,
-    },
-    {
-      id: "n-3",
-      title: "Quality Score Alert: Asset gen-2 scored 94.0",
-      time: "4h ago",
-      read: true,
-    },
-  ]);
+  // ── Real Notification State ──────────────────────────────────────────────
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [isLoadingNotifications, setIsLoadingNotifications] = useState(false);
+  const [notifError, setNotifError] = useState<string | null>(null);
+  const notifChannelRef = useRef<ReturnType<ReturnType<typeof createClient>['channel']> | null>(null);
+
+  const refreshNotifications = useCallback(async () => {
+    setIsLoadingNotifications(true);
+    setNotifError(null);
+    try {
+      const items = await fetchNotifications();
+      setNotifications(items);
+      setUnreadCount(items.filter((n) => !n.read).length);
+    } catch (err) {
+      setNotifError(err instanceof Error ? err.message : "Couldn't load notifications");
+    } finally {
+      setIsLoadingNotifications(false);
+    }
+  }, []);
+
+  // Initial load
+  useEffect(() => {
+    refreshNotifications();
+  }, [refreshNotifications]);
+
+  // Supabase Realtime — listen for INSERT/UPDATE on the notifications table
+  useEffect(() => {
+    const supabase = createClient();
+
+    const channel = supabase
+      .channel("notifications-realtime")
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "notifications" },
+        () => {
+          // Refresh the list whenever a new notification is inserted for this user
+          refreshNotifications();
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "notifications" },
+        () => {
+          refreshNotifications();
+        }
+      )
+      .subscribe();
+
+    notifChannelRef.current = channel;
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [refreshNotifications]);
+
+  const markNotificationsRead = useCallback(async () => {
+    // Optimistic update
+    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+    setUnreadCount(0);
+    // Persist to API
+    await markAllNotificationsAsRead();
+  }, []);
+
+  const markOneNotificationRead = useCallback(async (id: string) => {
+    // Optimistic update
+    setNotifications((prev) =>
+      prev.map((n) => (n.id === id ? { ...n, read: true } : n))
+    );
+    setUnreadCount((prev) => Math.max(0, prev - 1));
+    // Persist to API
+    await markNotificationAsRead(id);
+  }, []);
 
   const activeCampaign = campaigns.find((c) => c.id === activeCampaignId) || campaigns[0] || null;
 
@@ -373,9 +438,9 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
     setScheduledPosts((prev) => [newSchedule, ...prev]);
   };
 
-  const markNotificationsRead = () => {
-    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
-  };
+  const markNotificationsReadLegacy = useCallback(() => {
+    // Legacy shim — kept for type safety, but actual logic is in markNotificationsRead above
+  }, []);
 
   return (
     <StudioContext.Provider
@@ -396,7 +461,12 @@ export function StudioProvider({ children }: { children: React.ReactNode }) {
         scheduledPosts,
         scheduleAssetToInstagram,
         notifications,
+        unreadCount,
+        isLoadingNotifications,
+        notifError,
         markNotificationsRead,
+        markOneNotificationRead,
+        refreshNotifications,
         workspaces,
         activeWorkspace,
         setActiveWorkspace,

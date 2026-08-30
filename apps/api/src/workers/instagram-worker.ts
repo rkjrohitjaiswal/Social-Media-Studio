@@ -1,6 +1,7 @@
 import { encryptToken, decryptToken } from "../utils/encryption.js";
 import { InstagramProvider, MetaInstagramProvider } from "../integrations/instagram/provider";
 import { dispatchN8nEvent } from "../integrations/n8n/event-dispatcher";
+import { createNotification } from "../services/notification-service.js";
 
 export interface AccountState {
   id: string;
@@ -85,6 +86,7 @@ export function composeFinalCaption(caption: string, cta: string, hashtags: stri
 export async function enqueueInstagramPublishJob(params: {
   workspaceId: string;
   campaignId: string;
+  userId?: string;
   generatedAssetId: string;
   socialCopyId: string;
   caption: string;
@@ -153,6 +155,7 @@ async function executePublishWorkerJob(
   pubId: string,
   account: AccountState,
   params: {
+    userId?: string;
     imageUrl: string;
     caption: string;
     cta: string;
@@ -198,6 +201,19 @@ async function executePublishWorkerJob(
     pub.publishedAt = new Date().toISOString();
     pub.updatedAt = new Date().toISOString();
 
+    if (params.userId) {
+      createNotification({
+        userId: params.userId,
+        workspaceId: pub.workspaceId,
+        type: "PUBLISH_SUCCESS",
+        title: "Instagram Post Published Successfully",
+        message: `Your Instagram post has been published.`,
+        actionUrl: "/published",
+        entityType: "instagram_publication",
+        entityId: pub.id,
+      });
+    }
+
     dispatchN8nEvent({
       eventType: "instagram.published",
       workspaceId: pub.workspaceId,
@@ -233,6 +249,19 @@ async function executePublishWorkerJob(
     }
 
     pub.updatedAt = new Date().toISOString();
+
+    if (params.userId) {
+      createNotification({
+        userId: params.userId,
+        workspaceId: pub.workspaceId,
+        type: "PUBLISH_FAILED",
+        title: "Instagram Post Failed to Publish",
+        message: msg,
+        actionUrl: "/published",
+        entityType: "instagram_publication",
+        entityId: pub.id,
+      });
+    }
   }
 }
 

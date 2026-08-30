@@ -107,7 +107,8 @@ import { contentProjectsRouter } from "./routes/content-projects.js";
 app.use("/api/content-projects", contentProjectsRouter);
 import { uploadRouter } from "./routes/upload.js";
 app.use("/api/upload", uploadRouter);
-
+import { notificationsRouter } from "./routes/notifications.js";
+app.use("/api/notifications", notificationsRouter);
 
 
 import { startPublishingWorker } from "./workers/publishing-worker.js";

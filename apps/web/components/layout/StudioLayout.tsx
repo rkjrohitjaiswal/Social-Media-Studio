@@ -36,7 +36,12 @@ export default function StudioLayout({ children }: { children: React.ReactNode }
   const router = useRouter();
   const {
     notifications,
+    unreadCount,
+    isLoadingNotifications,
+    notifError,
     markNotificationsRead,
+    markOneNotificationRead,
+    refreshNotifications,
     workspaces,
     activeWorkspace,
     setActiveWorkspace,
@@ -53,7 +58,24 @@ export default function StudioLayout({ children }: { children: React.ReactNode }
 
   const sidebarProfileRef = useRef<HTMLDivElement>(null);
 
-  const unreadNotifsCount = notifications.filter((n) => !n.read).length;
+  // Format a createdAt ISO string into a human-readable relative time
+  function formatRelativeTime(isoDate: string): string {
+    try {
+      const diffMs = Date.now() - new Date(isoDate).getTime();
+      const diffMin = Math.floor(diffMs / 60000);
+      if (diffMin < 1) return "Just now";
+      if (diffMin < 60) return `${diffMin}m ago`;
+      const diffHr = Math.floor(diffMin / 60);
+      if (diffHr < 24) return `${diffHr}h ago`;
+      const diffDay = Math.floor(diffHr / 24);
+      if (diffDay === 1) return "Yesterday";
+      return `${diffDay}d ago`;
+    } catch {
+      return "";
+    }
+  }
+
+  const badgeLabel = unreadCount > 99 ? "99+" : unreadCount.toString();
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -538,9 +560,9 @@ export default function StudioLayout({ children }: { children: React.ReactNode }
                 aria-label="Notifications"
               >
                 <Bell className="w-4 h-4 text-[#9E9D98]" />
-                {unreadNotifsCount > 0 && (
-                  <span className="absolute -top-1 -right-1 w-4 h-4 bg-[#D4AF37] text-[#0B0C0E] font-bold text-[9px] rounded-full flex items-center justify-center">
-                    {unreadNotifsCount}
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] bg-[#D4AF37] text-[#0B0C0E] font-bold text-[9px] rounded-full flex items-center justify-center px-0.5">
+                    {badgeLabel}
                   </span>
                 )}
               </button>
@@ -549,34 +571,66 @@ export default function StudioLayout({ children }: { children: React.ReactNode }
                 <div className="absolute right-0 mt-2 w-80 bg-[#151618] border border-white/[0.08] rounded-2xl shadow-2xl z-50 p-4 space-y-3">
                   <div className="flex items-center justify-between border-b border-white/[0.08] pb-2">
                     <span className="text-xs font-bold text-[#F5F4F0]">Notifications</span>
-                    {unreadNotifsCount > 0 && (
+                    {unreadCount > 0 && (
                       <button
                         type="button"
-                        onClick={markNotificationsRead}
+                        onClick={() => { markNotificationsRead(); }}
                         className="text-[10px] text-[#D4AF37] hover:underline font-mono"
                       >
                         Mark all read
                       </button>
                     )}
                   </div>
-                  <div className="space-y-2 max-h-60 overflow-y-auto">
-                    {notifications.length > 0 ? (
+                  <div className="space-y-2 max-h-64 overflow-y-auto">
+                    {isLoadingNotifications ? (
+                      <div className="text-xs text-[#9E9D98] text-center py-6 animate-pulse">
+                        Loading notifications...
+                      </div>
+                    ) : notifError ? (
+                      <div className="text-center py-6 space-y-2">
+                        <div className="text-xs text-red-400">Couldn\'t load notifications</div>
+                        <button
+                          type="button"
+                          onClick={() => refreshNotifications()}
+                          className="text-[10px] text-[#D4AF37] hover:underline"
+                        >
+                          Retry
+                        </button>
+                      </div>
+                    ) : notifications.length > 0 ? (
                       notifications.map((n) => (
-                        <div
+                        <button
                           key={n.id}
-                          className={`p-2.5 rounded-xl text-xs space-y-1 ${
+                          type="button"
+                          onClick={() => {
+                            if (!n.read) markOneNotificationRead(n.id);
+                            if (n.actionUrl) router.push(n.actionUrl);
+                            setShowNotifDropdown(false);
+                          }}
+                          className={`w-full text-left p-2.5 rounded-xl text-xs space-y-1 transition-colors ${
                             n.read
-                              ? "bg-white/5 opacity-60"
-                              : "bg-[#D4AF37]/10 border border-[#D4AF37]/30"
+                              ? "bg-white/5 opacity-70 hover:opacity-100"
+                              : "bg-[#D4AF37]/10 border border-[#D4AF37]/30 hover:bg-[#D4AF37]/15"
                           }`}
                         >
-                          <div className="font-medium text-[#F5F4F0]">{n.title}</div>
-                          <div className="text-[10px] text-[#9E9D98] font-mono">{n.time}</div>
-                        </div>
+                          <div className="flex items-start gap-2">
+                            {!n.read && (
+                              <span className="mt-0.5 w-1.5 h-1.5 rounded-full bg-[#D4AF37] shrink-0" />
+                            )}
+                            <span className="font-medium text-[#F5F4F0] leading-snug">{n.title}</span>
+                          </div>
+                          {n.message && (
+                            <div className="text-[10px] text-[#9E9D98] line-clamp-2 pl-3.5">{n.message}</div>
+                          )}
+                          <div className="text-[10px] text-[#9E9D98] font-mono pl-3.5">
+                            {formatRelativeTime(n.createdAt)}
+                          </div>
+                        </button>
                       ))
                     ) : (
-                      <div className="text-xs text-[#9E9D98] text-center py-4">
-                        No notifications
+                      <div className="text-xs text-[#9E9D98] text-center py-6 space-y-1">
+                        <div>You\'re all caught up.</div>
+                        <div className="text-[10px] opacity-60">No notifications yet</div>
                       </div>
                     )}
                   </div>

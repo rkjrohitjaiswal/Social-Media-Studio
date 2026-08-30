@@ -8,6 +8,7 @@ import {
 import { checkUsageAccess, consumeUsage } from "./usage-service.js";
 import { OpenAIImageProvider } from "../integrations/ai/provider.js";
 import { getUserOpenAIApiKey } from "./credential-resolver.js";
+import { createNotification } from "./notification-service.js";
 
 // In-Memory store for tests and fallback execution
 const inMemoryRunsStore = new Map<string, CreativeGenerationRunResult>();
@@ -96,6 +97,16 @@ export async function generateMultiImageCreatives(params: {
   // 1. Credit Access Check
   const access = await checkUsageAccess(userId, "CONTENT_GENERATION");
   if (!access.allowed) {
+    // Notify the user that generation was blocked
+    createNotification({
+      userId,
+      workspaceId,
+      type: "GENERATION_FAILED",
+      title: "Creative Generation Failed",
+      message: access.message || "Your workspace credits are exhausted. Upgrade your plan.",
+      actionUrl: "/billing",
+      entityType: "generation",
+    });
     const err = new Error(access.message || "Your workspace credits are exhausted. Upgrade your plan to generate creatives.");
     (err as any).statusCode = 402;
     (err as any).code = access.code || "USAGE_LIMIT_REACHED";
@@ -191,6 +202,19 @@ export async function generateMultiImageCreatives(params: {
   };
 
   inMemoryRunsStore.set(runId, result);
+
+  // Notify user that batch generation completed
+  createNotification({
+    userId,
+    workspaceId,
+    type: "GENERATION_COMPLETED",
+    title: `Batch Generation Completed: ${count}/${count} Assets Ready`,
+    message: `Your creative batch (${rawInput.platform || "INSTAGRAM"} · ${stylePreset}) has finished generating.`,
+    actionUrl: "/create",
+    entityType: "generation_run",
+    entityId: runId,
+    metadata: { runId, count, stylePreset, platform: rawInput.platform || "INSTAGRAM" },
+  });
 
   // Best-effort Prisma DB Persistence
   try {
