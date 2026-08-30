@@ -3,9 +3,61 @@ import prisma from "@ai-social/database";
 import { AuthenticatedRequest, requireAuth, requireAdmin } from "../middleware/auth.js";
 import { SAAS_PLANS_REGISTRY, SubscriptionPlan } from "@ai-social/shared";
 
+import { authenticateAdminCredentials, ensureInitialAdminAccount } from "../services/admin-auth-service.js";
+
 export const adminRouter = Router();
 
-// Enforce both session auth and application admin checks across all endpoints in this router
+/**
+ * POST /api/admin/auth/login
+ * Dedicated authentication endpoint for system administrators.
+ */
+adminRouter.post("/auth/login", async (req, res) => {
+  try {
+    const { email, password } = req.body || {};
+    if (!email || !password) {
+      return res.status(400).json({ success: false, error: "Admin email and password are required" });
+    }
+
+    const authResult = await authenticateAdminCredentials(String(email), String(password));
+    if (!authResult.success || !authResult.session) {
+      return res.status(401).json({ success: false, error: authResult.error || "Invalid credentials" });
+    }
+
+    res.cookie("admin-access-token", authResult.session.token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 24 * 60 * 60 * 1000,
+    });
+
+    return res.json({
+      success: true,
+      message: "Admin authentication successful",
+      token: authResult.session.token,
+      user: {
+        id: authResult.session.userId,
+        email: authResult.session.email,
+        isAdmin: true,
+      },
+    });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return res.status(500).json({ success: false, error: `Authentication failed: ${msg}` });
+  }
+});
+
+/**
+ * GET /api/admin/auth/me
+ * Verifies current active admin session token.
+ */
+adminRouter.get("/auth/me", requireAuth as any, requireAdmin as any, (req: AuthenticatedRequest, res: Response) => {
+  return res.json({
+    success: true,
+    user: req.user,
+  });
+});
+
+// Enforce both session auth and application admin checks across all remaining endpoints in this router
 adminRouter.use(requireAuth as any);
 adminRouter.use(requireAdmin as any);
 

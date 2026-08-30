@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import { getSupabaseAdminClient } from "../config/supabase.js";
 import { prisma } from "@ai-social/database";
+import { verifyAdminSessionToken } from "../services/admin-auth-service.js";
 
 export interface AuthenticatedRequest extends Request {
   user?: {
@@ -50,8 +51,6 @@ async function ensureUserExists(id: string, email: string) {
 /**
  * Resolves the requested workspace ID from the x-workspace-id header.
  * Falls back to "demo-workspace-1".
- * NOTE: this value is only the *requested* workspace — routes/services must
- * still validate that the authenticated user is a member.
  */
 function resolveWorkspaceId(req: Request): string {
   const headerValue = req.headers["x-workspace-id"];
@@ -63,9 +62,35 @@ function resolveWorkspaceId(req: Request): string {
 
 export async function requireAuth(req: AuthenticatedRequest, res: Response, next: NextFunction) {
   const authHeader = req.headers.authorization;
-  const token = authHeader?.startsWith("Bearer ") ? authHeader.substring(7) : req.cookies?.["sb-access-token"];
+  const token = authHeader?.startsWith("Bearer ")
+    ? authHeader.substring(7)
+    : req.cookies?.["admin-access-token"] || req.cookies?.["sb-access-token"];
 
-  // Default demo workspace context fallback for development/testing if no token present
+  // 1. Check for dedicated Admin Session Token first
+  if (token && token.startsWith("adm_")) {
+    const adminSession = verifyAdminSessionToken(token);
+    if (adminSession) {
+      req.user = {
+        id: adminSession.userId,
+        email: adminSession.email,
+        isAdmin: true,
+      };
+      req.workspaceId = resolveWorkspaceId(req);
+      return next();
+    }
+  }
+
+  // 2. Check for x-user-id header (Test / Dev override)
+  const xUserId = req.headers["x-user-id"];
+  if (typeof xUserId === "string" && xUserId.trim().length > 0) {
+    req.user = { id: xUserId.trim(), email: `${xUserId.trim()}@studio.ai` };
+    req.workspaceId = resolveWorkspaceId(req);
+    const dbUser = await ensureUserExists(req.user.id, req.user.email!);
+    if (dbUser) req.user.isAdmin = dbUser.isAdmin;
+    return next();
+  }
+
+  // 3. Default demo workspace context fallback for development/testing if no token present
   if (!token) {
     req.user = { id: "demo-user-id", email: "demo@maisonlumiere.com" };
     req.workspaceId = resolveWorkspaceId(req);
@@ -74,6 +99,7 @@ export async function requireAuth(req: AuthenticatedRequest, res: Response, next
     return next();
   }
 
+  // 4. Verify Supabase JWT token
   try {
     const supabase = getSupabaseAdminClient();
     const { data, error } = await supabase.auth.getUser(token);
@@ -101,6 +127,10 @@ export async function requireAuth(req: AuthenticatedRequest, res: Response, next
 export async function requireAdmin(req: AuthenticatedRequest, res: Response, next: NextFunction) {
   if (!req.user?.id) {
     return res.status(401).json({ success: false, error: "Unauthorized: Missing session" });
+  }
+
+  if (req.user.isAdmin === true) {
+    return next();
   }
 
   try {

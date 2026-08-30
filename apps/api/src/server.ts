@@ -141,11 +141,18 @@ app.use("/api/profile", profileRouter);
 
 import { startPublishingWorker } from "./workers/publishing-worker.js";
 
+import { ensureInitialAdminAccount } from "./services/admin-auth-service.js";
+
 // Start HTTP Server
 if (process.env.NODE_ENV !== "test") {
-  app.listen(PORT, () => {
+  app.listen(PORT, async () => {
     console.log(`[API Server] Running on http://localhost:${PORT}`);
     startPublishingWorker();
+    try {
+      await ensureInitialAdminAccount();
+    } catch {
+      // Non-fatal
+    }
   });
 }
 

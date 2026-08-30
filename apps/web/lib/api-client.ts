@@ -287,6 +287,14 @@ export async function getAuthHeader(): Promise<Record<string, string>> {
     "x-workspace-id": getActiveWorkspaceId(),
   };
 
+  if (typeof window !== "undefined") {
+    const adminToken = localStorage.getItem("admin_access_token");
+    if (adminToken) {
+      headers["Authorization"] = `Bearer ${adminToken}`;
+      return headers;
+    }
+  }
+
   try {
     const supabase = createClient();
     const { data: { session } } = await supabase.auth.getSession();
@@ -619,5 +627,44 @@ export async function deleteProfileAvatar(): Promise<{ success: boolean; error?:
     return { success: true };
   } catch (err: unknown) {
     return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+export async function adminLogin(
+  email: string,
+  password: string
+): Promise<{ success: boolean; token?: string; user?: any; error?: string }> {
+  try {
+    const res = await apiFetch("/api/admin/auth/login", {
+      method: "POST",
+      body: JSON.stringify({ email, password }),
+    });
+    const body = (await res.json() as any);
+    if (!res.ok || !body.success) {
+      return { success: false, error: body.error || "Admin authentication failed" };
+    }
+    if (typeof window !== "undefined" && body.token) {
+      localStorage.setItem("admin_access_token", body.token);
+    }
+    return { success: true, token: body.token, user: body.user };
+  } catch (err: unknown) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+export async function fetchAdminSession(): Promise<{ authenticated: boolean; isAdmin: boolean; user?: any }> {
+  try {
+    const res = await apiFetch("/api/admin/auth/me");
+    if (!res.ok) return { authenticated: false, isAdmin: false };
+    const body = (await res.json() as any);
+    return { authenticated: true, isAdmin: body.user?.isAdmin === true, user: body.user };
+  } catch {
+    return { authenticated: false, isAdmin: false };
+  }
+}
+
+export function logoutAdmin(): void {
+  if (typeof window !== "undefined") {
+    localStorage.removeItem("admin_access_token");
   }
 }

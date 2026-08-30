@@ -31,6 +31,8 @@ import {
   revokeUserSubscription,
   adjustUserCredits,
   fetchAdminAuditLogs,
+  fetchAdminSession,
+  logoutAdmin,
   AdminStats,
   AdminUserListItem,
   AdminAuditLogItem,
@@ -98,6 +100,19 @@ export default function AdminDashboardPage() {
     setToastMessage(null);
 
     try {
+      const session = await fetchAdminSession();
+      if (!session.authenticated) {
+        router.push("/admin/login");
+        return;
+      }
+
+      if (!session.isAdmin) {
+        setIsUnauthorized(true);
+        setIsLoading(false);
+        setIsRefreshing(false);
+        return;
+      }
+
       const [statsRes, usersRes] = await Promise.all([
         fetchAdminStats(),
         fetchAdminUsers(page, 20, search, plan, source),
