@@ -106,30 +106,30 @@ describe("5-Tier SaaS Platform Comprehensive Suite (50 Scenarios)", () => {
   });
 
   describe("Phase 7: Free Trial (Scenarios 8-13)", () => {
-    it("8. New user gets exactly 3 free workflows", async () => {
+    it("8. New user gets exactly 10 free workflows", async () => {
       const usage = await getUserUsage("user-free-trial");
-      expect(usage.freeCreditsTotal).toBe(3);
+      expect(usage.freeCreditsTotal).toBe(10);
       expect(usage.freeCreditsUsed).toBe(0);
-      expect(usage.freeCreditsRemaining).toBe(3);
+      expect(usage.freeCreditsRemaining).toBe(10);
     });
 
     it("9, 10, 11. Workflows consume 1 credit sequentially", async () => {
       const userId = "user-free-seq";
       await consumeUsage(userId, "CONTENT_GENERATION");
-      expect((await getUserUsage(userId)).freeCreditsRemaining).toBe(2);
+      expect((await getUserUsage(userId)).freeCreditsRemaining).toBe(9);
 
       await consumeUsage(userId, "CONTENT_GENERATION");
-      expect((await getUserUsage(userId)).freeCreditsRemaining).toBe(1);
+      expect((await getUserUsage(userId)).freeCreditsRemaining).toBe(8);
 
       await consumeUsage(userId, "CONTENT_GENERATION");
-      expect((await getUserUsage(userId)).freeCreditsRemaining).toBe(0);
+      expect((await getUserUsage(userId)).freeCreditsRemaining).toBe(7);
     });
 
-    it("12. 4th workflow is blocked for Free plan", async () => {
+    it("12. 11th workflow is blocked for Free plan", async () => {
       const userId = "user-free-blocked";
-      await consumeUsage(userId, "CONTENT_GENERATION");
-      await consumeUsage(userId, "CONTENT_GENERATION");
-      await consumeUsage(userId, "CONTENT_GENERATION");
+      for (let i = 0; i < 10; i++) {
+        await consumeUsage(userId, "CONTENT_GENERATION");
+      }
 
       const access = await checkUsageAccess(userId, "CONTENT_GENERATION");
       expect(access.allowed).toBe(false);
@@ -138,10 +138,10 @@ describe("5-Tier SaaS Platform Comprehensive Suite (50 Scenarios)", () => {
       await expect(consumeUsage(userId, "CONTENT_GENERATION")).rejects.toThrow("PLAN_LIMIT_REACHED");
     });
 
-    it("13. Free usage does not reset monthly", async () => {
+    it("13. Free usage provides permanent credits + 3 monthly renewable credits", async () => {
       const plan = await getUserPlan("user-free-noreset");
       expect(plan).toBe("FREE");
-      expect(SAAS_PLANS_REGISTRY.FREE.isLifetimeLimit).toBe(true);
+      expect(SAAS_PLANS_REGISTRY.FREE.description).toContain("10 permanent free credits");
     });
   });
 

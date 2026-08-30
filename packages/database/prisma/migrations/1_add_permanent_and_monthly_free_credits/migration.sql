@@ -1,0 +1,7 @@
+ALTER TABLE "UserUsage"
+ADD COLUMN "permanentCreditsTotal" INTEGER NOT NULL DEFAULT 10,
+ADD COLUMN "permanentCreditsUsed" INTEGER NOT NULL DEFAULT 0,
+ADD COLUMN "monthlyCreditsAllowance" INTEGER NOT NULL DEFAULT 3,
+ADD COLUMN "monthlyCreditsUsed" INTEGER NOT NULL DEFAULT 0,
+ADD COLUMN "monthlyCycleStart" TIMESTAMP(3),
+ADD COLUMN "lastMonthlyReset" TIMESTAMP(3);

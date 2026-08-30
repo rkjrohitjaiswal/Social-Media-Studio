@@ -14,6 +14,15 @@ export interface BillingStatusResponse {
   monthlyWorkflowsLimit: number;
   workflowsUsed: number;
   workflowsRemaining: number;
+  totalRemainingCredits?: number;
+  permanentRemainingCredits?: number;
+  permanentTotalCredits?: number;
+  permanentUsedCredits?: number;
+  monthlyRemainingCredits?: number;
+  monthlyAllowance?: number;
+  monthlyUsedCredits?: number;
+  nextMonthlyResetDate?: string | null;
+  isInitialMonth?: boolean;
   subscriptionSource?: "RAZORPAY" | "ADMIN_GRANT" | string;
   socialAccountLimit: number;
   socialAccountsConnected: number;

@@ -39,9 +39,9 @@ export function UsageWidget() {
     );
   }
 
-  const limit = typeof usage.monthlyLimit === "number" ? usage.monthlyLimit : 10;
-  const remaining = typeof usage.remainingCredits === "number" ? usage.remainingCredits : 0;
-  const percentUsed = Math.min(100, Math.round((usage.usedCredits / Math.max(1, limit)) * 100));
+  const remaining = typeof usage.totalRemainingCredits === "number" ? usage.totalRemainingCredits : usage.remainingCredits ?? 0;
+  const permRemaining = typeof usage.permanentRemainingCredits === "number" ? usage.permanentRemainingCredits : remaining;
+  const monthlyRemaining = typeof usage.monthlyRemainingCredits === "number" ? usage.monthlyRemainingCredits : 0;
   const isExhausted = remaining <= 0;
 
   return (
@@ -52,26 +52,18 @@ export function UsageWidget() {
           <span>Workspace Credits ({usage.plan})</span>
         </div>
         <span className="text-[#f5f4f0]">
-          {remaining} / {limit} Available
+          {remaining} Available
         </span>
       </div>
 
-      {/* PROGRESS BAR */}
-      <div className="w-full bg-white/10 h-2 rounded-full overflow-hidden">
-        <div
-          className={`h-full transition-all duration-500 ${
-            isExhausted ? "bg-red-500" : percentUsed > 80 ? "bg-amber-500" : "bg-[#c5a059]"
-          }`}
-          style={{ width: `${percentUsed}%` }}
-        />
-      </div>
-
       <div className="flex items-center justify-between text-[11px] text-[#9e9d98]">
-        <span>Used: {usage.usedCredits} credits</span>
+        <span>
+          Perm: <strong className="text-[#f5f4f0]">{permRemaining}</strong> | Monthly: <strong className="text-[#f5f4f0]">{monthlyRemaining}</strong>
+        </span>
         {isExhausted ? (
           <span className="text-red-400 font-bold">Credits Exhausted — Upgrade Plan</span>
         ) : (
-          <span>{remaining} remaining this cycle</span>
+          <span>{remaining} total available</span>
         )}
       </div>
     </div>

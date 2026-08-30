@@ -38,11 +38,11 @@ export const SAAS_PLANS_REGISTRY: Record<SubscriptionPlan, PlanDefinition> = {
     name: "Free Trial",
     priceInr: 0,
     monthlyWorkflows: 10,
-    isLifetimeLimit: true,
+    isLifetimeLimit: false,
     socialAccountLimit: 1,
     rateLimitPerHour: 10,
     features: ["BASIC_SCHEDULING", "BASIC_ANALYTICS"],
-    description: "10 free demo credits for testing brand setup and generation.",
+    description: "10 permanent free credits + 3 free credits every month after your first month.",
   },
   PRO: {
     id: "PRO",

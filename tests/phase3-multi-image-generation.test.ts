@@ -120,39 +120,29 @@ describe("Phase 3 Part 1 — Multi-Image AI Creative Generation", () => {
         stylePreset: "LUXURY",
       },
     });
-    await generateMultiImageCreatives({
-      userId,
-      workspaceId,
-      input: {
-        inputImageUrls: ["https://images.unsplash.com/photo-1548036328-c9fa89d128fa"],
-        creativeBrief: "Run 2",
-        platform: "INSTAGRAM",
-        aspectRatio: "4:5",
-        count: 1,
-        stylePreset: "LUXURY",
-      },
-    });
-    await generateMultiImageCreatives({
-      userId,
-      workspaceId,
-      input: {
-        inputImageUrls: ["https://images.unsplash.com/photo-1548036328-c9fa89d128fa"],
-        creativeBrief: "Run 3",
-        platform: "INSTAGRAM",
-        aspectRatio: "4:5",
-        count: 1,
-        stylePreset: "LUXURY",
-      },
-    });
+    for (let i = 2; i <= 10; i++) {
+      await generateMultiImageCreatives({
+        userId,
+        workspaceId,
+        input: {
+          inputImageUrls: ["https://images.unsplash.com/photo-1548036328-c9fa89d128fa"],
+          creativeBrief: `Run ${i}`,
+          platform: "INSTAGRAM",
+          aspectRatio: "4:5",
+          count: 1,
+          stylePreset: "LUXURY",
+        },
+      });
+    }
 
-    // 4th run -> REJECTED
+    // 11th run -> REJECTED
     await expect(
       generateMultiImageCreatives({
         userId,
         workspaceId,
         input: {
           inputImageUrls: ["https://images.unsplash.com/photo-1548036328-c9fa89d128fa"],
-          creativeBrief: "Run 4 (Exhausted)",
+          creativeBrief: "Run 11 (Exhausted)",
           platform: "INSTAGRAM",
           aspectRatio: "4:5",
           count: 1,

@@ -63,10 +63,10 @@ describe("Phase 1 Feature Test Suite — AI Social Media Studio", () => {
       expect(usage.freeCreditsUsed).toBe(1);
     });
 
-    it("1.4 enforces 3 lifetime free credit limit server-side", async () => {
-      await consumeUsage("user-phase1-limit", "CONTENT_GENERATION");
-      await consumeUsage("user-phase1-limit", "CONTENT_GENERATION");
-      await consumeUsage("user-phase1-limit", "CONTENT_GENERATION");
+    it("1.4 enforces 10 lifetime free credit limit server-side", async () => {
+      for (let i = 0; i < 10; i++) {
+        await consumeUsage("user-phase1-limit", "CONTENT_GENERATION");
+      }
 
       const access = await checkUsageAccess("user-phase1-limit", "CONTENT_GENERATION");
       expect(access.allowed).toBe(false);

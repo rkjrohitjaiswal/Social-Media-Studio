@@ -194,6 +194,9 @@ adminRouter.post("/users/:id/subscription", async (req: AuthenticatedRequest, re
     await prisma.userUsage.upsert({
       where: { userId: targetUserId },
       update: {
+        monthlyCreditsAllowance: newCreditLimit,
+        monthlyCreditsUsed: 0,
+        lastMonthlyReset: now,
         freeCreditsTotal: newCreditLimit,
         updatedAt: now,
       },
@@ -201,6 +204,11 @@ adminRouter.post("/users/:id/subscription", async (req: AuthenticatedRequest, re
         userId: targetUserId,
         freeCreditsTotal: newCreditLimit,
         freeCreditsUsed: 0,
+        permanentCreditsTotal: 10,
+        permanentCreditsUsed: 0,
+        monthlyCreditsAllowance: newCreditLimit,
+        monthlyCreditsUsed: 0,
+        lastMonthlyReset: now,
       },
     });
 
@@ -265,17 +273,24 @@ adminRouter.delete("/users/:id/subscription", async (req: AuthenticatedRequest, 
       },
     });
 
-    // 2. Reset user usage credits to FREE default (10)
+    // 2. Reset user monthly credits to FREE default (3), preserving permanent credits
     await prisma.userUsage.upsert({
       where: { userId: targetUserId },
       update: {
-        freeCreditsTotal: 10,
+        monthlyCreditsAllowance: 3,
+        monthlyCreditsUsed: 0,
+        lastMonthlyReset: now,
         updatedAt: now,
       },
       create: {
         userId: targetUserId,
         freeCreditsTotal: 10,
         freeCreditsUsed: 0,
+        permanentCreditsTotal: 10,
+        permanentCreditsUsed: 0,
+        monthlyCreditsAllowance: 3,
+        monthlyCreditsUsed: 0,
+        lastMonthlyReset: now,
       },
     });
 

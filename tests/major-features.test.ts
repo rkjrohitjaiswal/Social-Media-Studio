@@ -99,7 +99,7 @@ describe("5 Major Product Features Test Suite", () => {
       await saveUserCredential(userId, "OPENAI", "sk-test-key");
 
       const initialUsage = await getUserUsage(userId);
-      expect(initialUsage.freeCreditsRemaining).toBe(3);
+      expect(initialUsage.freeCreditsRemaining).toBe(10);
 
       const result = await repurposeContent(userId, {
         sourceText: "10 key strategies for mastering digital luxury brand storytelling.",
@@ -115,7 +115,7 @@ describe("5 Major Product Features Test Suite", () => {
 
       // Usage checked
       const postUsage = await getUserUsage(userId);
-      expect(postUsage.freeCreditsRemaining).toBe(2);
+      expect(postUsage.freeCreditsRemaining).toBe(9);
     });
 
     it("adapts base content with platform-specific rules", async () => {

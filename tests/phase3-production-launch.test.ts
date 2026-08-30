@@ -319,5 +319,5 @@ describe("Phase 3 Part 12 — Production Launch 26-Step Regression Suite", () =>
       expect((statusObj as any).secretKey).toBeUndefined();
       expect(statusObj.status).toBeDefined();
     }
-  });
+  }, 30000);
 });

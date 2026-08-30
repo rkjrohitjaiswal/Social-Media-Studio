@@ -76,10 +76,10 @@ describe("Phase 2B — Performance Intelligence & 'Create More Like This' Test S
   it("5. Create More Like This & Credit System: generates variations and enforces credit deduction", async () => {
     const userId = "credit-test-user-p2b";
 
-    // Initial access check: 3 free credits available
+    // Initial access check: 10 free credits available
     let access = await checkUsageAccess(userId, "CONTENT_GENERATION");
     expect(access.allowed).toBe(true);
-    expect(access.freeCreditsRemaining).toBe(3);
+    expect(access.freeCreditsRemaining).toBe(10);
 
     // Generate variations -> Consumes 1 credit
     const variations = await generateCreateMoreLikeThisVariations(userId, "media-1", 3, "INSTAGRAM");
@@ -89,15 +89,16 @@ describe("Phase 2B — Performance Intelligence & 'Create More Like This' Test S
     expect(variations.variations.length).toBe(3);
     expect(variations.variations[0].studioUrl).toContain("/create?topic=");
 
-    // Verify 1 credit consumed (2 remaining)
+    // Verify 1 credit consumed (9 remaining)
     access = await checkUsageAccess(userId, "CONTENT_GENERATION");
-    expect(access.freeCreditsRemaining).toBe(2);
+    expect(access.freeCreditsRemaining).toBe(9);
 
-    // Consume remaining credits to test enforcement limit
-    await consumeUsage(userId, "CONTENT_GENERATION");
-    await consumeUsage(userId, "CONTENT_GENERATION");
+    // Consume remaining 9 credits to test enforcement limit
+    for (let i = 0; i < 9; i++) {
+      await consumeUsage(userId, "CONTENT_GENERATION");
+    }
 
-    // 4th generation attempt must fail with PLAN_LIMIT_REACHED or USAGE_LIMIT_REACHED
+    // 11th generation attempt must fail with PLAN_LIMIT_REACHED or USAGE_LIMIT_REACHED
     access = await checkUsageAccess(userId, "CONTENT_GENERATION");
     expect(access.allowed).toBe(false);
   });

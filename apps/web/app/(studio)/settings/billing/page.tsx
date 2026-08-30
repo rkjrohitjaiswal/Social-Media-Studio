@@ -139,14 +139,23 @@ export default function BillingSettingsPage() {
           </span>
         </div>
 
+        {billingStatus?.plan === "FREE" && (
+          <div className="p-4 rounded-2xl bg-[#c5a059]/10 border border-[#c5a059]/30 text-xs text-[#f5f4f0] space-y-1">
+            <div className="font-semibold text-[#c5a059]">Free Credit Entitlements</div>
+            <p>10 permanent free credits + 3 free credits every month after your first month.</p>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
           <div className="p-4 rounded-2xl bg-[#0b0c0e] border border-white/5 space-y-2">
             <div className="text-[#9e9d98]">Workflow Usage</div>
             <div className="text-lg font-bold font-mono text-[#f5f4f0]">
-              {billingStatus?.workflowsUsed ?? 0} / {billingStatus?.monthlyWorkflowsLimit ?? 10}
+              {billingStatus?.totalRemainingCredits ?? billingStatus?.workflowsRemaining ?? 10} Available
             </div>
             <div className="text-[11px] text-[#4e8765]">
-              {billingStatus?.workflowsRemaining ?? 10} workflows remaining
+              {billingStatus?.permanentRemainingCredits !== undefined
+                ? `Perm: ${billingStatus.permanentRemainingCredits} | Monthly: ${billingStatus.monthlyRemainingCredits ?? 0}`
+                : `${billingStatus?.workflowsRemaining ?? 10} credits remaining`}
             </div>
           </div>
 

@@ -25,7 +25,7 @@ async function ensureUserExists(id: string, email: string) {
       select: { id: true, isAdmin: true },
     });
 
-    // Ensure initial UserUsage record with 10 demo credits exists for new user
+    // Ensure initial UserUsage record with 10 permanent free credits exists for new user
     await prisma.userUsage.upsert({
       where: { userId: id },
       update: {},
@@ -33,6 +33,10 @@ async function ensureUserExists(id: string, email: string) {
         userId: id,
         freeCreditsTotal: 10,
         freeCreditsUsed: 0,
+        permanentCreditsTotal: 10,
+        permanentCreditsUsed: 0,
+        monthlyCreditsAllowance: 3,
+        monthlyCreditsUsed: 0,
       },
     });
 

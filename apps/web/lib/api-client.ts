@@ -408,6 +408,15 @@ export interface UserUsageData {
   usedCredits: number;
   remainingCredits: number;
   resetPeriod?: string;
+  totalRemainingCredits?: number;
+  permanentRemainingCredits?: number;
+  permanentTotalCredits?: number;
+  permanentUsedCredits?: number;
+  monthlyRemainingCredits?: number;
+  monthlyAllowance?: number;
+  monthlyUsedCredits?: number;
+  nextMonthlyResetDate?: string;
+  isInitialMonth?: boolean;
 }
 
 /** Fetch current user/workspace usage & credit state. */

@@ -80,29 +80,29 @@ describe("SaaS Multi-User Platform Suite", () => {
   });
 
   describe("Phase 3 & 4 — Free Usage Credits & Enforcement", () => {
-    it("7. grants exactly 3 free credits to a new user", async () => {
+    it("7. grants exactly 10 free credits to a new user", async () => {
       const usage = await getUserUsage("user-new-100");
-      expect(usage.freeCreditsTotal).toBe(3);
+      expect(usage.freeCreditsTotal).toBe(10);
       expect(usage.freeCreditsUsed).toBe(0);
-      expect(usage.freeCreditsRemaining).toBe(3);
+      expect(usage.freeCreditsRemaining).toBe(10);
     });
 
     it("8, 9, 10. consumes credits sequentially for workflows", async () => {
       const u1 = await consumeUsage("user-new-100", "CONTENT_GENERATION");
-      expect(u1.freeCreditsRemaining).toBe(2);
+      expect(u1.freeCreditsRemaining).toBe(9);
 
       const u2 = await consumeUsage("user-new-100", "CONTENT_GENERATION");
-      expect(u2.freeCreditsRemaining).toBe(1);
+      expect(u2.freeCreditsRemaining).toBe(8);
 
       const u3 = await consumeUsage("user-new-100", "CONTENT_GENERATION");
-      expect(u3.freeCreditsRemaining).toBe(0);
+      expect(u3.freeCreditsRemaining).toBe(7);
     });
 
-    it("11. blocks 4th workflow when free credits are exhausted and user is not Pro", async () => {
+    it("11. blocks 11th workflow when free credits are exhausted and user is not Pro", async () => {
       const userId = "user-exhausted-1";
-      await consumeUsage(userId, "CONTENT_GENERATION");
-      await consumeUsage(userId, "CONTENT_GENERATION");
-      await consumeUsage(userId, "CONTENT_GENERATION");
+      for (let i = 0; i < 10; i++) {
+        await consumeUsage(userId, "CONTENT_GENERATION");
+      }
 
       const access = await checkUsageAccess(userId, "CONTENT_GENERATION");
       expect(access.allowed).toBe(false);
@@ -116,8 +116,8 @@ describe("SaaS Multi-User Platform Suite", () => {
       const usageA = await getUserUsage("user-A");
       const usageB = await getUserUsage("user-B");
 
-      expect(usageA.freeCreditsRemaining).toBe(2);
-      expect(usageB.freeCreditsRemaining).toBe(3);
+      expect(usageA.freeCreditsRemaining).toBe(9);
+      expect(usageB.freeCreditsRemaining).toBe(10);
     });
   });
 
