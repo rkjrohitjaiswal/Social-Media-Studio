@@ -282,20 +282,28 @@ export async function getUserUsage(userIdOrWorkspaceId: string): Promise<Detaile
 
   // ── LAZY MONTHLY CYCLE RESET ───────────────────────────────────────────────
   // Trigger reset if:
-  // 1. Haven't performed a monthly reset for the current cycle yet (cycleStart > lastMonthlyReset), OR
-  // 2. Transitioning from Month 1 (allowance=10) to Month 2+ (allowance=3) on FREE plan.
+  // 1. Haven't performed a monthly reset for the current cycle yet, OR
+  // 2. monthlyCycleStart is missing / outdated, OR
+  // 3. freeCreditsTotal does not match current cycle allowance (e.g. Month 1 -> Month 2 transition), OR
+  // 4. Stale legacy DB record has freeCreditsUsed exceeding currentAllowance.
   const needsReset =
+    !record.monthlyCycleStart ||
+    record.monthlyCycleStart < cycleInfo.cycleStart ||
     !record.lastMonthlyReset ||
     record.lastMonthlyReset < cycleInfo.cycleStart ||
-    record.freeCreditsTotal !== currentAllowance;
+    record.freeCreditsTotal !== currentAllowance ||
+    record.freeCreditsUsed > currentAllowance;
 
   if (needsReset) {
+    const isNewCycle = !record.monthlyCycleStart || record.monthlyCycleStart < cycleInfo.cycleStart;
+    const newUsed = isNewCycle ? 0 : Math.min(record.freeCreditsUsed, currentAllowance);
+
     record.freeCreditsTotal = currentAllowance;
-    record.freeCreditsUsed = 0;
+    record.freeCreditsUsed = newUsed;
     record.permanentCreditsTotal = currentAllowance;
-    record.permanentCreditsUsed = 0;
+    record.permanentCreditsUsed = newUsed;
     record.monthlyCreditsAllowance = currentAllowance;
-    record.monthlyCreditsUsed = 0;
+    record.monthlyCreditsUsed = newUsed;
     record.monthlyCycleStart = cycleInfo.cycleStart;
     record.lastMonthlyReset = now;
     record.updatedAt = now;
@@ -307,11 +315,11 @@ export async function getUserUsage(userIdOrWorkspaceId: string): Promise<Detaile
         where: { userId },
         data: {
           freeCreditsTotal: currentAllowance,
-          freeCreditsUsed: 0,
+          freeCreditsUsed: newUsed,
           permanentCreditsTotal: currentAllowance,
-          permanentCreditsUsed: 0,
+          permanentCreditsUsed: newUsed,
           monthlyCreditsAllowance: currentAllowance,
-          monthlyCreditsUsed: 0,
+          monthlyCreditsUsed: newUsed,
           monthlyCycleStart: cycleInfo.cycleStart,
           lastMonthlyReset: now,
           updatedAt: now,
@@ -335,7 +343,7 @@ export async function getUserUsage(userIdOrWorkspaceId: string): Promise<Detaile
     remainingCredits: freeCreditsRemaining,
     totalRemainingCredits: freeCreditsRemaining,
 
-    // Backward-compatible mirror fields for single-balance model
+    // Mirror fields for backward compatibility
     permanentCreditsTotal: freeCreditsTotal,
     permanentCreditsUsed: freeCreditsUsed,
     permanentCreditsRemaining: freeCreditsRemaining,

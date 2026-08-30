@@ -74,7 +74,7 @@ export function UsageWidget() {
         {isExhausted ? (
           <span className="text-red-400 font-bold">Credits Exhausted — Upgrade Plan</span>
         ) : (
-          <span>{usage.isInitialMonth ? "First Month: 10 Credits" : "Cycle: 3 Credits/Month"}</span>
+          <span>{usage.isInitialMonth ? "First month allowance" : "Monthly allowance"}</span>
         )}
       </div>
     </div>

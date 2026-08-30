@@ -164,7 +164,7 @@ export default function BillingSettingsPage() {
               {billingStatus?.monthlyWorkflowsLimit ?? 10} <span className="text-xs font-normal text-[#9e9d98]">credits</span>
             </div>
             <div className="text-[11px] text-[#9e9d98]">
-              {billingStatus?.isInitialMonth ? "First Month Allocation (10)" : "Monthly Allocation (3)"}
+              {billingStatus?.isInitialMonth ? "First month allowance" : "Monthly allowance"}
             </div>
           </div>
 
