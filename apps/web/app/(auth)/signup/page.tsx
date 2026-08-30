@@ -268,6 +268,8 @@ export default function SignupPage() {
                     <UserIcon className="w-4 h-4 text-[#9E9D98] absolute left-3.5 top-1/2 -translate-y-1/2" />
                     <input
                       type="text"
+                      name="name"
+                      autoComplete="name"
                       placeholder="Your name"
                       value={name}
                       onChange={(e) => setName(e.target.value)}
@@ -291,6 +293,8 @@ export default function SignupPage() {
                     <Mail className="w-4 h-4 text-[#9E9D98] absolute left-3.5 top-1/2 -translate-y-1/2" />
                     <input
                       type="email"
+                      name="email"
+                      autoComplete="username"
                       placeholder="you@company.com"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
@@ -314,6 +318,8 @@ export default function SignupPage() {
                     <Lock className="w-4 h-4 text-[#9E9D98] absolute left-3.5 top-1/2 -translate-y-1/2" />
                     <input
                       type={showPassword ? "text" : "password"}
+                      name="password"
+                      autoComplete="new-password"
                       placeholder="Minimum 8 characters"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}

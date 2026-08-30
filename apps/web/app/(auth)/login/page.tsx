@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Sparkles, ArrowLeft, Mail, Lock, Eye, EyeOff, AlertCircle, Loader2 } from "lucide-react";
@@ -9,14 +9,20 @@ import { loginSchema } from "@ai-social/shared";
 
 export default function LoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState("director@maisonlumiere.com");
-  const [password, setPassword] = useState("password123");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [rememberSession, setRememberSession] = useState(true);
 
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const [authError, setAuthError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+
+  // Ensure form state always initializes empty on client hydration
+  useEffect(() => {
+    setEmail("");
+    setPassword("");
+  }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -131,6 +137,8 @@ export default function LoginPage() {
                 <Mail className="w-4 h-4 text-[#9E9D98] absolute left-3.5 top-1/2 -translate-y-1/2" />
                 <input
                   type="email"
+                  name="email"
+                  autoComplete="username"
                   placeholder="name@company.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -160,6 +168,8 @@ export default function LoginPage() {
                 <Lock className="w-4 h-4 text-[#9E9D98] absolute left-3.5 top-1/2 -translate-y-1/2" />
                 <input
                   type={showPassword ? "text" : "password"}
+                  name="password"
+                  autoComplete="current-password"
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
