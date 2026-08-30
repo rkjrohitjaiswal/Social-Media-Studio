@@ -11,10 +11,10 @@ export interface BillingStatusResponse {
   plan: SubscriptionPlan | string;
   status: SubscriptionStatus;
   priceInr: number;
-  monthlyWorkflowsLimit: number | string;
+  monthlyWorkflowsLimit: number;
   workflowsUsed: number;
-  workflowsRemaining: number | string;
-  isUnlimited?: boolean;
+  workflowsRemaining: number;
+  subscriptionSource?: "RAZORPAY" | "ADMIN_GRANT" | string;
   socialAccountLimit: number;
   socialAccountsConnected: number;
   rateLimitPerHour: number;

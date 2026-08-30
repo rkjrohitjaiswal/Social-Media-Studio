@@ -25,7 +25,7 @@ import {
   Clock,
   ShieldAlert,
 } from "lucide-react";
-import { getAuthHeader } from "@/lib/api-client";
+import { getAuthHeader, uploadProfileAvatar, deleteProfileAvatar } from "@/lib/api-client";
 
 interface UserProfile {
   id: string;
@@ -77,6 +77,59 @@ export default function ProfileAccountPage() {
   const [editFullName, setEditFullName] = useState("");
   const [editAvatarUrl, setEditAvatarUrl] = useState("");
   const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      setErrorMsg("File size exceeds 5MB limit");
+      return;
+    }
+
+    setIsUploadingAvatar(true);
+    setErrorMsg(null);
+    setSuccessMsg(null);
+
+    try {
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const base64 = reader.result as string;
+        const res = await uploadProfileAvatar(base64, file.type);
+        if (res.success && res.avatarUrl) {
+          setEditAvatarUrl(res.avatarUrl);
+          setSuccessMsg("Profile picture uploaded!");
+          await loadProfileData(true);
+        } else {
+          setErrorMsg(res.error || "Failed to upload profile picture");
+        }
+        setIsUploadingAvatar(false);
+      };
+      reader.onerror = () => {
+        setErrorMsg("Failed to read file");
+        setIsUploadingAvatar(false);
+      };
+      reader.readAsDataURL(file);
+    } catch {
+      setErrorMsg("Upload error");
+      setIsUploadingAvatar(false);
+    }
+  };
+
+  const handleRemoveAvatar = async () => {
+    setIsUploadingAvatar(true);
+    setErrorMsg(null);
+    const res = await deleteProfileAvatar();
+    if (res.success) {
+      setEditAvatarUrl("");
+      setSuccessMsg("Profile picture removed!");
+      await loadProfileData(true);
+    } else {
+      setErrorMsg(res.error || "Failed to remove avatar");
+    }
+    setIsUploadingAvatar(false);
+  };
 
   // Change Password Modal State
   const [showPasswordModal, setShowPasswordModal] = useState(false);
@@ -507,7 +560,35 @@ export default function ProfileAccountPage() {
               </div>
 
               <div>
-                <label className="block text-[10px] text-[#A8A39A] uppercase mb-1">Avatar Image URL</label>
+                <label className="block text-[10px] text-[#A8A39A] uppercase mb-1">Profile Picture</label>
+                <div className="flex items-center gap-3">
+                  <label className="px-3 py-1.5 rounded-xl bg-[#0B0C0E] border border-white/10 text-xs text-[#D4AF37] hover:border-[#D4AF37] cursor-pointer transition-colors flex items-center gap-1.5 font-sans font-medium">
+                    {isUploadingAvatar && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                    <span>Upload Image (JPG, PNG, WEBP)</span>
+                    <input
+                      type="file"
+                      accept="image/png,image/jpeg,image/jpg,image/webp"
+                      onChange={handleFileUpload}
+                      disabled={isUploadingAvatar}
+                      className="hidden"
+                    />
+                  </label>
+
+                  {editAvatarUrl && (
+                    <button
+                      type="button"
+                      onClick={handleRemoveAvatar}
+                      disabled={isUploadingAvatar}
+                      className="px-3 py-1.5 rounded-xl bg-red-500/10 border border-red-500/20 text-xs text-red-400 hover:bg-red-500/20 transition-colors font-sans"
+                    >
+                      Remove Picture
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[10px] text-[#A8A39A] uppercase mb-1">Avatar Image URL (Optional Direct Link)</label>
                 <input
                   type="text"
                   value={editAvatarUrl}

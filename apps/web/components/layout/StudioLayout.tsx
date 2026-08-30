@@ -27,11 +27,12 @@ import {
   X,
   Building2,
   Zap,
+  Shield,
 } from "lucide-react";
 import { useStudio } from "@/lib/studio-context";
 import { createClient } from "@/lib/supabase/client";
 import { GlobalSearchModal } from "@/components/studio/GlobalSearchModal";
-import { fetchUserUsage, UserUsageData } from "@/lib/api-client";
+import { fetchUserUsage, UserUsageData, getAuthHeader } from "@/lib/api-client";
 
 export default function StudioLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -55,7 +56,12 @@ export default function StudioLayout({ children }: { children: React.ReactNode }
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const [userProfile, setUserProfile] = useState<{ name: string; email: string } | null>(null);
+  const [userProfile, setUserProfile] = useState<{
+    name: string;
+    email: string;
+    avatarUrl?: string | null;
+    isAdmin?: boolean;
+  } | null>(null);
   const [userUsage, setUserUsage] = useState<UserUsageData | null>(null);
 
   const sidebarProfileRef = useRef<HTMLDivElement>(null);
@@ -114,6 +120,26 @@ export default function StudioLayout({ children }: { children: React.ReactNode }
 
   useEffect(() => {
     async function loadUserSession() {
+      try {
+        const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+        const authHeader = await getAuthHeader();
+        const res = await fetch(`${apiBase}/api/profile`, {
+          headers: { ...authHeader },
+        });
+        const json = await res.json();
+        if (json.success && json.user) {
+          setUserProfile({
+            name: json.user.fullName || json.user.firstName || json.user.email.split("@")[0] || "Studio User",
+            email: json.user.email,
+            avatarUrl: json.user.avatarUrl,
+            isAdmin: Boolean(json.user.isAdmin),
+          });
+          return;
+        }
+      } catch {
+        // Fallback to Supabase auth session
+      }
+
       const supabase = createClient();
       const {
         data: { user },
@@ -382,9 +408,17 @@ export default function StudioLayout({ children }: { children: React.ReactNode }
             >
               {/* HEADER WITH AVATAR / NAME / EMAIL */}
               <div className="px-3 py-2.5 border-b border-white/[0.08] flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-[#D4AF37]/20 border border-[#D4AF37]/40 text-[#D4AF37] font-bold flex items-center justify-center text-xs shrink-0">
-                  {userProfile?.name ? userProfile.name.charAt(0).toUpperCase() : "A"}
-                </div>
+                {userProfile?.avatarUrl ? (
+                  <img
+                    src={userProfile.avatarUrl}
+                    alt="Avatar"
+                    className="w-8 h-8 rounded-xl object-cover border border-[#D4AF37]/40 shrink-0"
+                  />
+                ) : (
+                  <div className="w-8 h-8 rounded-xl bg-[#D4AF37]/20 border border-[#D4AF37]/40 text-[#D4AF37] font-bold flex items-center justify-center text-xs shrink-0">
+                    {userProfile?.name ? userProfile.name.charAt(0).toUpperCase() : "A"}
+                  </div>
+                )}
                 <div className="truncate">
                   <div className="text-xs font-semibold text-[#F5F4F0] truncate">
                     {userProfile?.name || "Alex"}
@@ -397,6 +431,23 @@ export default function StudioLayout({ children }: { children: React.ReactNode }
 
               {/* MENU ITEMS */}
               <div className="py-1">
+                {userProfile?.isAdmin && (
+                  <Link
+                    href="/admin"
+                    onClick={() => {
+                      setShowSidebarProfileMenu(false);
+                      setIsMobileMenuOpen(false);
+                    }}
+                    className={`flex items-center gap-2.5 px-3 py-2 text-xs font-medium transition-all ${
+                      pathname.startsWith("/admin")
+                        ? "bg-[#D4AF37]/15 text-[#D4AF37]"
+                        : "text-[#D4AF37] hover:bg-[#D4AF37]/10"
+                    }`}
+                  >
+                    <Shield className="w-4 h-4 text-[#D4AF37]" />
+                    <span>Admin Dashboard</span>
+                  </Link>
+                )}
                 <Link
                   href="/settings"
                   onClick={() => {
@@ -482,9 +533,17 @@ export default function StudioLayout({ children }: { children: React.ReactNode }
             }`}
           >
             <div className="flex items-center gap-2.5 truncate">
-              <div className="w-8 h-8 rounded-xl bg-[#D4AF37]/20 border border-[#D4AF37]/40 text-[#D4AF37] font-bold flex items-center justify-center text-xs shrink-0 group-hover:border-[#D4AF37]">
-                {userProfile?.name ? userProfile.name.charAt(0).toUpperCase() : "A"}
-              </div>
+              {userProfile?.avatarUrl ? (
+                <img
+                  src={userProfile.avatarUrl}
+                  alt="Avatar"
+                  className="w-8 h-8 rounded-xl object-cover border border-[#D4AF37]/40 shrink-0 group-hover:border-[#D4AF37]"
+                />
+              ) : (
+                <div className="w-8 h-8 rounded-xl bg-[#D4AF37]/20 border border-[#D4AF37]/40 text-[#D4AF37] font-bold flex items-center justify-center text-xs shrink-0 group-hover:border-[#D4AF37]">
+                  {userProfile?.name ? userProfile.name.charAt(0).toUpperCase() : "A"}
+                </div>
+              )}
               {!collapsed && (
                 <div className="truncate">
                   <div className="text-xs font-semibold text-[#F5F4F0] truncate group-hover:text-[#D4AF37] transition-colors">
@@ -657,20 +716,13 @@ export default function StudioLayout({ children }: { children: React.ReactNode }
             <div
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#0B0C0E] border border-white/[0.08] text-xs font-medium text-[#F5F4F0] hover:border-[#D4AF37]/40 transition-colors shrink-0"
               title={
-                userUsage?.isUnlimited || userUsage?.remainingCredits === "Unlimited" || userUsage?.monthlyLimit === "Unlimited"
-                  ? "Unlimited Application Credits"
-                  : userUsage
+                userUsage
                   ? `${userUsage.remainingCredits} / ${userUsage.monthlyLimit} Credits Available`
                   : "Usage Credits"
               }
             >
               <Zap className="w-3.5 h-3.5 text-[#D4AF37] fill-[#D4AF37] shrink-0" />
-              {userUsage?.isUnlimited || userUsage?.remainingCredits === "Unlimited" || userUsage?.monthlyLimit === "Unlimited" ? (
-                <span className="font-semibold text-[#D4AF37]">
-                  <span className="hidden sm:inline">∞ Unlimited</span>
-                  <span className="sm:hidden">∞</span>
-                </span>
-              ) : userUsage ? (
+              {userUsage ? (
                 <span className="font-semibold">
                   <span>{userUsage.remainingCredits}</span>
                   <span className="hidden sm:inline text-[#9E9D98] ml-1">Credits</span>

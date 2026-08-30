@@ -180,6 +180,7 @@ model User {
   lastName       String?
   avatarUrl      String?
   supabaseUid    String              @unique
+  isAdmin        Boolean             @default(false)
   createdAt      DateTime            @default(now())
   updatedAt      DateTime            @updatedAt
   memberships    WorkspaceMember[]
@@ -929,6 +930,18 @@ enum SubscriptionStatus {
 
 enum BillingProvider {
   RAZORPAY
+  ADMIN_GRANT
+}
+
+enum SubscriptionSource {
+  RAZORPAY
+  ADMIN_GRANT
+}
+
+enum AdminAuditAction {
+  GRANT_SUBSCRIPTION
+  CHANGE_SUBSCRIPTION
+  REVOKE_SUBSCRIPTION
 }
 
 enum PaymentProviderType {
@@ -952,7 +965,7 @@ model UserApiCredential {
 model UserUsage {
   id               String   @id @default(uuid())
   userId           String   @unique
-  freeCreditsTotal Int      @default(3)
+  freeCreditsTotal Int      @default(10)
   freeCreditsUsed  Int      @default(0)
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
@@ -967,17 +980,38 @@ model Subscription {
   provider               BillingProvider    @default(RAZORPAY)
   providerCustomerId     String?
   providerSubscriptionId String?            @unique
+  subscriptionSource     SubscriptionSource @default(RAZORPAY)
+  grantedByUserId        String?
+  grantedAt              DateTime?
   plan                   SubscriptionPlan   @default(FREE)
   status                 SubscriptionStatus @default(EXPIRED)
   currentPeriodStart     DateTime?
   currentPeriodEnd       DateTime?
   cancelAtPeriodEnd      Boolean            @default(false)
+  notes                  String?
   createdAt              DateTime           @default(now())
   updatedAt              DateTime           @updatedAt
   user                   User               @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([status])
+  @@index([subscriptionSource])
+}
+
+model AdminAuditLog {
+  id                 String             @id @default(uuid())
+  adminUserId        String
+  targetUserId       String
+  action             AdminAuditAction
+  previousPlan       String?
+  newPlan            String?
+  subscriptionSource SubscriptionSource @default(ADMIN_GRANT)
+  metadataJson       Json?
+  createdAt          DateTime           @default(now())
+
+  @@index([adminUserId])
+  @@index([targetUserId])
+  @@index([createdAt])
 }
 
 enum WorkspaceRole {

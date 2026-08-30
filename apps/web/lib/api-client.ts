@@ -393,10 +393,9 @@ export async function deleteNotificationApi(id: string): Promise<void> {
 
 export interface UserUsageData {
   plan: string;
-  isUnlimited?: boolean;
-  monthlyLimit: number | string;
+  monthlyLimit: number;
   usedCredits: number;
-  remainingCredits: number | string;
+  remainingCredits: number;
   resetPeriod?: string;
 }
 
@@ -412,5 +411,131 @@ export async function fetchUserUsage(): Promise<UserUsageData | null> {
     return null;
   } catch {
     return null;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Admin & Profile API
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface AdminStats {
+  totalUsers: number;
+  paidUsers: number;
+  freeUsers: number;
+  activeSubscriptions: number;
+}
+
+export interface AdminUserListItem {
+  id: string;
+  email: string;
+  name: string;
+  avatarUrl?: string | null;
+  isAdmin: boolean;
+  createdAt: string;
+  currentPlan: string;
+  subscriptionStatus: string;
+  subscriptionSource: string;
+  currentPeriodEnd?: string | null;
+  creditsTotal: number;
+  creditsUsed: number;
+  creditsRemaining: number;
+}
+
+export async function fetchAdminStats(): Promise<AdminStats | null> {
+  try {
+    const res = await apiFetch("/api/admin/stats");
+    if (!res.ok) return null;
+    const body = (await res.json() as any);
+    return body.stats || null;
+  } catch {
+    return null;
+  }
+}
+
+export async function fetchAdminUsers(
+  page: number = 1,
+  limit: number = 20,
+  search: string = ""
+): Promise<{ users: AdminUserListItem[]; totalPages: number; total: number } | null> {
+  try {
+    const query = new URLSearchParams({
+      page: String(page),
+      limit: String(limit),
+      search,
+    }).toString();
+
+    const res = await apiFetch(`/api/admin/users?${query}`);
+    if (!res.ok) return null;
+    const body = (await res.json() as any);
+    return {
+      users: body.users || [],
+      totalPages: body.pagination?.totalPages || 1,
+      total: body.pagination?.total || 0,
+    };
+  } catch {
+    return null;
+  }
+}
+
+export async function grantUserSubscription(
+  targetUserId: string,
+  plan: string,
+  durationDays: number = 30,
+  notes?: string
+): Promise<{ success: boolean; message?: string; error?: string }> {
+  try {
+    const res = await apiFetch(`/api/admin/users/${targetUserId}/subscription`, {
+      method: "POST",
+      body: JSON.stringify({ plan, durationDays, notes }),
+    });
+    const body = (await res.json() as any);
+    if (!res.ok) return { success: false, error: body.error || "Failed to grant subscription" };
+    return { success: true, message: body.message };
+  } catch (err: unknown) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+export async function revokeUserSubscription(
+  targetUserId: string
+): Promise<{ success: boolean; message?: string; error?: string }> {
+  try {
+    const res = await apiFetch(`/api/admin/users/${targetUserId}/subscription`, {
+      method: "DELETE",
+    });
+    const body = (await res.json() as any);
+    if (!res.ok) return { success: false, error: body.error || "Failed to revoke subscription" };
+    return { success: true, message: body.message };
+  } catch (err: unknown) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+export async function uploadProfileAvatar(
+  imageBase64: string,
+  mimeType?: string
+): Promise<{ success: boolean; avatarUrl?: string; error?: string }> {
+  try {
+    const res = await apiFetch("/api/profile/avatar", {
+      method: "POST",
+      body: JSON.stringify({ imageBase64, mimeType }),
+    });
+    const body = (await res.json() as any);
+    if (!res.ok) return { success: false, error: body.error || "Upload failed" };
+    return { success: true, avatarUrl: body.avatarUrl };
+  } catch (err: unknown) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+export async function deleteProfileAvatar(): Promise<{ success: boolean; error?: string }> {
+  try {
+    const res = await apiFetch("/api/profile/avatar", {
+      method: "DELETE",
+    });
+    if (!res.ok) return { success: false, error: "Failed to delete avatar" };
+    return { success: true };
+  } catch (err: unknown) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
   }
 }

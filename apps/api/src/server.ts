@@ -109,6 +109,10 @@ import { uploadRouter } from "./routes/upload.js";
 app.use("/api/upload", uploadRouter);
 import { notificationsRouter } from "./routes/notifications.js";
 app.use("/api/notifications", notificationsRouter);
+import { adminRouter } from "./routes/admin.js";
+app.use("/api/admin", adminRouter);
+import { profileRouter } from "./routes/profile.js";
+app.use("/api/profile", profileRouter);
 
 
 import { startPublishingWorker } from "./workers/publishing-worker.js";

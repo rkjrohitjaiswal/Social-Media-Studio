@@ -120,6 +120,15 @@ export default function BillingSettingsPage() {
           <div>
             <h3 className="font-semibold text-base text-[#f5f4f0] flex items-center gap-2">
               Active Plan: {billingStatus?.plan || "FREE"}{" "}
+              {billingStatus?.subscriptionSource === "ADMIN_GRANT" ? (
+                <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-[#D4AF37]/20 border border-[#D4AF37]/30 text-[#D4AF37]">
+                  Admin Granted
+                </span>
+              ) : billingStatus?.plan !== "FREE" ? (
+                <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-500/20 border border-emerald-500/30 text-emerald-400">
+                  Paid (Razorpay)
+                </span>
+              ) : null}
               <Sparkles className="w-4 h-4 text-[#c5a059]" />
             </h3>
             <p className="text-xs text-[#9e9d98]">Current billing cycle entitlements & usage tracking.</p>
@@ -134,12 +143,10 @@ export default function BillingSettingsPage() {
           <div className="p-4 rounded-2xl bg-[#0b0c0e] border border-white/5 space-y-2">
             <div className="text-[#9e9d98]">Workflow Usage</div>
             <div className="text-lg font-bold font-mono text-[#f5f4f0]">
-              {billingStatus?.workflowsUsed ?? 0} / {billingStatus?.isUnlimited || billingStatus?.monthlyWorkflowsLimit === "Unlimited" ? "Unlimited" : (billingStatus?.monthlyWorkflowsLimit ?? 3)}
+              {billingStatus?.workflowsUsed ?? 0} / {billingStatus?.monthlyWorkflowsLimit ?? 10}
             </div>
             <div className="text-[11px] text-[#4e8765]">
-              {billingStatus?.isUnlimited || billingStatus?.workflowsRemaining === "Unlimited"
-                ? "∞ Unlimited workflows available"
-                : `${billingStatus?.workflowsRemaining ?? 3} workflows remaining`}
+              {billingStatus?.workflowsRemaining ?? 10} workflows remaining
             </div>
           </div>
 

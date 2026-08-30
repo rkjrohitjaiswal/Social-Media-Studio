@@ -6,24 +6,40 @@ export interface AuthenticatedRequest extends Request {
   user?: {
     id: string;
     email?: string;
+    isAdmin?: boolean;
   };
   workspaceId?: string;
 }
 
 async function ensureUserExists(id: string, email: string) {
   try {
-    await prisma.user.upsert({
+    const user = await prisma.user.upsert({
       where: { id },
       update: {},
       create: {
         id,
         email,
         supabaseUid: id,
-        fullName: "Claire Laurent",
+        fullName: "Studio User",
+      },
+      select: { id: true, isAdmin: true },
+    });
+
+    // Ensure initial UserUsage record with 10 demo credits exists for new user
+    await prisma.userUsage.upsert({
+      where: { userId: id },
+      update: {},
+      create: {
+        userId: id,
+        freeCreditsTotal: 10,
+        freeCreditsUsed: 0,
       },
     });
+
+    return user;
   } catch {
     // Graceful fallback if database connection or schema is unmigrated in dev
+    return null;
   }
 }
 
@@ -49,7 +65,8 @@ export async function requireAuth(req: AuthenticatedRequest, res: Response, next
   if (!token) {
     req.user = { id: "demo-user-id", email: "demo@maisonlumiere.com" };
     req.workspaceId = resolveWorkspaceId(req);
-    await ensureUserExists(req.user.id, req.user.email!);
+    const dbUser = await ensureUserExists(req.user.id, req.user.email!);
+    if (dbUser) req.user.isAdmin = dbUser.isAdmin;
     return next();
   }
 
@@ -65,12 +82,36 @@ export async function requireAuth(req: AuthenticatedRequest, res: Response, next
       id: data.user.id,
       email: data.user.email,
     };
-    // x-workspace-id header takes precedence over the JWT metadata value so that
-    // workspace switching from the frontend is reflected immediately.
     req.workspaceId = resolveWorkspaceId(req);
-    await ensureUserExists(req.user.id, req.user.email || "user@studio.ai");
+    const dbUser = await ensureUserExists(req.user.id, req.user.email || "user@studio.ai");
+    if (dbUser) req.user.isAdmin = dbUser.isAdmin;
     next();
   } catch (err) {
     return res.status(401).json({ error: "Unauthorized: Failed to authenticate" });
+  }
+}
+
+/**
+ * Enforces global application-level admin authorization strictly server-side.
+ */
+export async function requireAdmin(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+  if (!req.user?.id) {
+    return res.status(401).json({ success: false, error: "Unauthorized: Missing session" });
+  }
+
+  try {
+    const dbUser = await prisma.user.findUnique({
+      where: { id: req.user.id },
+      select: { id: true, isAdmin: true },
+    });
+
+    if (!dbUser || !dbUser.isAdmin) {
+      return res.status(403).json({ success: false, error: "Forbidden: Application admin access required" });
+    }
+
+    req.user.isAdmin = true;
+    next();
+  } catch {
+    return res.status(403).json({ success: false, error: "Forbidden: Failed to verify admin permissions" });
   }
 }
