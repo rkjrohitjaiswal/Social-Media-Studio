@@ -33,23 +33,47 @@ const PORT = process.env.PORT || 4000;
 
 // CORS configuration
 const allowedOrigins = [
-  process.env.FRONTEND_URL || process.env.WEB_URL || "http://localhost:3000",
+  "https://social-media-studio-web.vercel.app",
   "http://localhost:3000",
   "http://127.0.0.1:3000",
+  "http://localhost:3001",
 ];
 
-app.use(
-  cors({
-    origin: (origin, callback) => {
-      if (!origin || allowedOrigins.includes(origin) || process.env.NODE_ENV !== "production") {
-        callback(null, true);
-      } else {
-        callback(new Error("CORS policy violation: Origin not allowed"), false);
-      }
-    },
-    credentials: true,
-  })
-);
+if (process.env.FRONTEND_URL) allowedOrigins.push(process.env.FRONTEND_URL);
+if (process.env.WEB_URL) allowedOrigins.push(process.env.WEB_URL);
+
+export function isAllowedCorsOrigin(origin?: string): boolean {
+  if (!origin) return true;
+  if (allowedOrigins.includes(origin)) return true;
+  if (/\.vercel\.app$/.test(origin)) return true;
+  if (process.env.NODE_ENV !== "production") return true;
+  return false;
+}
+
+const corsOptions: cors.CorsOptions = {
+  origin: (origin, callback) => {
+    if (isAllowedCorsOrigin(origin)) {
+      callback(null, true);
+    } else {
+      callback(null, false);
+    }
+  },
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: [
+    "Content-Type",
+    "Authorization",
+    "X-Workspace-Id",
+    "x-workspace-id",
+    "Accept",
+    "Origin",
+    "X-Requested-With",
+  ],
+  optionsSuccessStatus: 200,
+};
+
+app.use(cors(corsOptions));
+app.options("*", cors(corsOptions));
 
 app.use(
   express.json({
