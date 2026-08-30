@@ -100,8 +100,10 @@ export default function AdminDashboardPage() {
     setToastMessage(null);
 
     try {
+      // 1. Verify Admin Authentication & Session
       const session = await fetchAdminSession();
       if (!session.authenticated) {
+        logoutAdmin();
         router.push("/admin/login");
         return;
       }
@@ -113,25 +115,33 @@ export default function AdminDashboardPage() {
         return;
       }
 
+      setIsUnauthorized(false);
+
+      // 2. Fetch Directory Stats & User Directory Data
       const [statsRes, usersRes] = await Promise.all([
         fetchAdminStats(),
         fetchAdminUsers(page, 20, search, plan, source),
       ]);
 
-      if (!statsRes && !usersRes) {
-        setIsUnauthorized(true);
-        return;
-      }
-
-      setIsUnauthorized(false);
       if (statsRes) setStats(statsRes);
       if (usersRes) {
         setUsers(usersRes.users);
         setTotalUsers(usersRes.total);
         setTotalPages(usersRes.totalPages);
       }
-    } catch {
-      setIsUnauthorized(true);
+
+      if (!statsRes && !usersRes) {
+        setToastMessage({
+          type: "error",
+          text: "Unable to load user directory data from API backend.",
+        });
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setToastMessage({
+        type: "error",
+        text: `Error loading admin dashboard data: ${msg}`,
+      });
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);

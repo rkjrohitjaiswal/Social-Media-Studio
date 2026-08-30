@@ -78,6 +78,8 @@ export async function requireAuth(req: AuthenticatedRequest, res: Response, next
       req.workspaceId = resolveWorkspaceId(req);
       return next();
     }
+    // If token starts with adm_ but verification fails -> return 401 directly
+    return res.status(401).json({ success: false, error: "Unauthorized: Invalid or expired admin session token" });
   }
 
   // 2. Check for x-user-id header (Test / Dev override)
