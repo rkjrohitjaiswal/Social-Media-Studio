@@ -32,7 +32,8 @@ interface ProjectItem {
 }
 
 export default function StudioDashboardPage() {
-  const [userName, setUserName] = useState("Alex");
+  const [userName, setUserName] = useState<string | null>(null);
+  const [isLoadingUser, setIsLoadingUser] = useState(true);
   const [upcomingSchedules, setUpcomingSchedules] = useState<ScheduledState[]>([]);
   const [analyticsReach, setAnalyticsReach] = useState<number | null>(null);
   const [analyticsEngRate, setAnalyticsEngRate] = useState<number | null>(null);
@@ -43,18 +44,28 @@ export default function StudioDashboardPage() {
     let isMounted = true;
 
     async function loadUser() {
-      const supabase = createClient();
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      try {
+        const supabase = createClient();
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
 
-      if (isMounted && user) {
-        setUserName(
-          user.user_metadata?.full_name ||
-            user.user_metadata?.first_name ||
-            user.email?.split("@")[0] ||
-            "Alex"
-        );
+        if (isMounted) {
+          if (user) {
+            const name =
+              user.user_metadata?.full_name ||
+              user.user_metadata?.first_name ||
+              user.email?.split("@")[0];
+            setUserName(name || "User");
+          } else {
+            setUserName(null);
+          }
+          setIsLoadingUser(false);
+        }
+      } catch {
+        if (isMounted) {
+          setIsLoadingUser(false);
+        }
       }
     }
 
@@ -117,8 +128,12 @@ export default function StudioDashboardPage() {
               <Sparkles className="w-3.5 h-3.5" />
               <span>My Workspace</span>
             </div>
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#F5F4F0]">
-              Good morning, {userName}
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#F5F4F0] min-h-[36px] flex items-center">
+              {isLoadingUser ? (
+                <span className="inline-block w-48 h-8 bg-white/10 rounded-lg animate-pulse" />
+              ) : (
+                `Good morning, ${userName || "User"}`
+              )}
             </h1>
             <p className="text-xs text-[#9E9D98]">
               Create, refine and publish your content from one workspace.

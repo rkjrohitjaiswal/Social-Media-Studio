@@ -147,14 +147,11 @@ export default function StudioLayout({ children }: { children: React.ReactNode }
 
       if (user) {
         setUserProfile({
-          name: user.user_metadata?.full_name || user.email?.split("@")[0] || "Alex",
-          email: user.email || "alex@studio.io",
+          name: user.user_metadata?.full_name || user.email?.split("@")[0] || "User",
+          email: user.email || "",
         });
       } else {
-        setUserProfile({
-          name: "Alex",
-          email: "alex@studio.io",
-        });
+        setUserProfile(null);
       }
     }
 
@@ -416,16 +413,25 @@ export default function StudioLayout({ children }: { children: React.ReactNode }
                   />
                 ) : (
                   <div className="w-8 h-8 rounded-xl bg-[#D4AF37]/20 border border-[#D4AF37]/40 text-[#D4AF37] font-bold flex items-center justify-center text-xs shrink-0">
-                    {userProfile?.name ? userProfile.name.charAt(0).toUpperCase() : "A"}
+                    {userProfile?.name ? userProfile.name.charAt(0).toUpperCase() : <User className="w-4 h-4 text-[#D4AF37]" />}
                   </div>
                 )}
-                <div className="truncate">
-                  <div className="text-xs font-semibold text-[#F5F4F0] truncate">
-                    {userProfile?.name || "Alex"}
-                  </div>
-                  <div className="text-[10px] text-[#9E9D98] truncate">
-                    {userProfile?.email || "alex@studio.io"}
-                  </div>
+                <div className="truncate min-w-[120px]">
+                  {userProfile ? (
+                    <>
+                      <div className="text-xs font-semibold text-[#F5F4F0] truncate">
+                        {userProfile.name}
+                      </div>
+                      <div className="text-[10px] text-[#9E9D98] truncate">
+                        {userProfile.email}
+                      </div>
+                    </>
+                  ) : (
+                    <div className="space-y-1">
+                      <div className="w-20 h-3 bg-white/10 rounded animate-pulse" />
+                      <div className="w-28 h-2.5 bg-white/10 rounded animate-pulse" />
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -541,17 +547,26 @@ export default function StudioLayout({ children }: { children: React.ReactNode }
                 />
               ) : (
                 <div className="w-8 h-8 rounded-xl bg-[#D4AF37]/20 border border-[#D4AF37]/40 text-[#D4AF37] font-bold flex items-center justify-center text-xs shrink-0 group-hover:border-[#D4AF37]">
-                  {userProfile?.name ? userProfile.name.charAt(0).toUpperCase() : "A"}
+                  {userProfile?.name ? userProfile.name.charAt(0).toUpperCase() : <User className="w-4 h-4 text-[#D4AF37]" />}
                 </div>
               )}
               {!collapsed && (
-                <div className="truncate">
-                  <div className="text-xs font-semibold text-[#F5F4F0] truncate group-hover:text-[#D4AF37] transition-colors">
-                    {userProfile?.name || "Alex"}
-                  </div>
-                  <div className="text-[10px] text-[#9E9D98] truncate">
-                    {userProfile?.email || "alex@studio.io"}
-                  </div>
+                <div className="truncate min-w-[120px]">
+                  {userProfile ? (
+                    <>
+                      <div className="text-xs font-semibold text-[#F5F4F0] truncate group-hover:text-[#D4AF37] transition-colors">
+                        {userProfile.name}
+                      </div>
+                      <div className="text-[10px] text-[#9E9D98] truncate">
+                        {userProfile.email}
+                      </div>
+                    </>
+                  ) : (
+                    <div className="space-y-1 py-0.5">
+                      <div className="w-20 h-3 bg-white/10 rounded animate-pulse" />
+                      <div className="w-28 h-2.5 bg-white/10 rounded animate-pulse" />
+                    </div>
+                  )}
                 </div>
               )}
             </div>

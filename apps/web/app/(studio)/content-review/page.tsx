@@ -47,7 +47,7 @@ const MOCK_REVIEW_ITEMS: PlatformReviewCard[] = [
   {
     id: "rev-2",
     platform: "LINKEDIN",
-    accountName: "Alex Rivera (Personal Profile)",
+    accountName: "Studio Member (Personal Profile)",
     contentType: "CERTIFICATION",
     mediaUrl: "https://images.unsplash.com/photo-1523293182086-7651a899d37f?q=80&w=600&auto=format&fit=crop",
     title: "Milestone: AWS Certified AI Specialist",

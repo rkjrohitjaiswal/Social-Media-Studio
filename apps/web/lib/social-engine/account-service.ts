@@ -39,7 +39,7 @@ const accountsStore: SocialAccountData[] = [
     platform: "LINKEDIN",
     externalAccountId: "li-2001",
     username: "Personal Profile",
-    displayName: "Alex Rivera",
+    displayName: "Studio Member",
     profileImageUrl: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100",
     accountType: "PERSONAL",
     status: "CONNECTED",
